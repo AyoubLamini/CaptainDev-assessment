@@ -3,7 +3,7 @@
 
 ## CaptainDevSubmit
 
-Assessment planning repository for NOVA, a fictional SaaS product. All implementation source lives in a separate candidate-controlled private GitHub repository — no code is written or run here. Planning docs are in `docs/`; normative reading order and source-precedence rules are in `README.md`.
+Ayoub's private implementation repository for the NOVA SaaS technical assessment. Prescribed stack: strict TypeScript, Next.js (web), NestJS (API), PostgreSQL + Prisma, Resend. Assessment planning docs (CaptainDev-authored) are in `docs/`; normative reading order and source-precedence rules are in `README.md`.
 
 ## Policy
 
