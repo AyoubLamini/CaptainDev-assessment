@@ -1,0 +1,73 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 08-16-2026 15:00
+last_updated: 08-16-2026 15:00
+project: CaptainDevAssessment
+project_key: NOKEY
+tracking_system: file-system
+story_location: 
+  c:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts
+development_status:
+  epic-1: backlog
+  1-1-monorepo-skeleton-with-module-boundaries: backlog
+  1-2-database-schema-migrations-forced-postgresql-rls: backlog
+  1-3-transactional-email-adapter: backlog
+  1-4-ci-pipeline-test-harness-synthetic-seed-data: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-platform-administrator-secure-bootstrap: backlog
+  2-2-email-password-login-server-side-session: backlog
+  2-3-csrf-protection-session-rotation: backlog
+  2-4-neutral-password-reset-flow: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-organization-provisioning-platform-directory: backlog
+  3-2-initial-owner-invitation-organization-activation: backlog
+  3-3-commercial-status-access-status-management: backlog
+  3-4-terminal-disablement-narrowly-scoped-platform-interventions: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-company-management-create-edit-deactivate: backlog
+  4-2-guided-business-scope-creation-flow: backlog
+  4-3-authorized-company-scope-search: backlog
+  4-4-responsive-company-scope-administration-ui: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-collaborator-invitation-account-activation: backlog
+  5-2-invitation-lifecycle-management-resend-revoke-expiry: backlog
+  5-3-permission-presets-explicit-grant-management: backlog
+  5-4-suspension-reactivation-logical-removal: backlog
+  5-5-administrator-promotion-atomic-ownership-transfer: backlog
+  epic-5-retrospective: optional
