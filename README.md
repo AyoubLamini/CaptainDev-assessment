@@ -52,3 +52,32 @@ If documents appear to conflict, use this order:
 5. UX mockups for visual intent only.
 
 Ask for clarification when a conflict cannot be resolved by this order. Do not silently weaken a requirement.
+
+## Getting Started
+
+**Prerequisites:** Node.js ≥ 22, pnpm ≥ 9.
+
+```bash
+# Install all workspace dependencies
+pnpm install
+
+# Start the NestJS API (http://localhost:3001)
+pnpm --filter @nova/api start:dev
+
+# Start the Next.js web app (http://localhost:3000)
+pnpm --filter @nova/web dev
+
+# Type-check all workspace packages
+pnpm -r tsc --noEmit
+
+# Build the API
+pnpm --filter @nova/api build
+
+# Build the web app
+pnpm --filter @nova/web build
+
+# Run unit tests
+pnpm --filter @nova/api test
+```
+
+Health check: `GET http://localhost:3001/health` → `{"status":"ok"}`
