@@ -1,0 +1,11 @@
+{
+  "bmad-loop": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "uv run --no-project python C:\\Users\\ayoub\\OneDrive\\Desktop\\CaptainDevSubmit\\.bmad-loop\\bmad_loop_hook.py Stop",
+        "timeout": 60
+      }
+    ]
+  }
+}
