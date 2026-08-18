@@ -15,3 +15,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-1-monorepo-skeleton-with-module-boundaries.md`
   summary: Enforce cross-module import boundaries with an ESLint rule (e.g. import/no-restricted-paths or eslint-plugin-boundaries).
   evidence: The spec requires that no module imports another's internal service file directly, but this is currently enforced only by convention. A developer mistake would not be caught by tsc or CI until Story 1.4's lint step is in place.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-1-2-database-schema-migrations-forced-postgresql-rls.md`
+  summary: Add timestamps (createdAt) to the Evidence audit log and EmailOutbox models.
+  evidence: Standard audit and outbox patterns require timestamps. The spec's minimal schema omitted them, but they are necessary for production observability.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-1-2-database-schema-migrations-forced-postgresql-rls.md`
+  summary: Optimize EmailOutbox payload and add lifecycle fields (status, processedAt).
+  evidence: The payload is typed as a String instead of Json, and it lacks state trackers for a reliable transactional outbox pattern.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-1-2-database-schema-migrations-forced-postgresql-rls.md`
+  summary: Add explicit foreign key indexes (@@index) across Prisma schema models.
+  evidence: Prisma generates FK constraints but doesn't auto-index them, which will cause full table scans on cascading deletes and reverse lookups.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-1-2-database-schema-migrations-forced-postgresql-rls.md`
+  summary: Add updatedAt timestamps to core mutable models.
+  evidence: Core models like Organization, Identity, Company, and BusinessScope are missing standard @updatedAt timestamp fields.

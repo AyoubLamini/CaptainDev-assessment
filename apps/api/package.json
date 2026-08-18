@@ -7,12 +7,14 @@
     "build": "nest build",
     "test": "cross-env VITE_CONFIG_NATIVE_IGNORE_WARNING=true vitest run",
     "tsc": "tsc --noEmit",
-    "lint": "echo \"lint: ok\""
+    "lint": "echo \"lint: ok\"",
+    "migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@prisma/client": "^5.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -23,6 +25,7 @@
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^4.1.10",
     "cross-env": "^10.1.0",
+    "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "vitest": "^4.1.10"

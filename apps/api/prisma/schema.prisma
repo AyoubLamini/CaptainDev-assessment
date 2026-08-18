@@ -1,0 +1,108 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  companies       Company[]
+  scopes          BusinessScope[]
+  evidence        Evidence[]
+  emailOutboxes   EmailOutbox[]
+
+  @@map("organization")
+}
+
+model Identity {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  passwordCredential PasswordCredential?
+  sessions           Session[]
+  resetTokens        PasswordResetToken[]
+
+  @@map("identity")
+}
+
+model PasswordCredential {
+  id           String   @id @default(uuid())
+  identityId   String   @unique @map("identity_id")
+  passwordHash String   @map("password_hash")
+  
+  identity     Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@map("password_credential")
+}
+
+model Session {
+  id           String   @id // hashed session id
+  identityId   String   @map("identity_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime @map("expires_at")
+
+  identity     Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model PasswordResetToken {
+  id           String   @id // hashed token
+  identityId   String   @map("identity_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime @map("expires_at")
+
+  identity     Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_token")
+}
+
+model Company {
+  id             String
+  organizationId String       @map("organization_id")
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scopes         BusinessScope[]
+
+  @@id([organizationId, id])
+  @@map("company")
+}
+
+model BusinessScope {
+  id             String
+  organizationId String       @map("organization_id")
+  companyId      String       @map("company_id")
+  
+  company        Company      @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, id])
+  @@map("business_scope")
+}
+
+model EmailOutbox {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  payload        String
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("email_outbox")
+}
+
+model Evidence {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  actorId        String       @map("actor_id")
+  action         String
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("evidence")
+}
