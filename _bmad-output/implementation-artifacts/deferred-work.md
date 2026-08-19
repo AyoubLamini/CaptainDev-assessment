@@ -96,3 +96,23 @@ status: open
 - source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-1-collaborator-invitation-account-activation.md`
   summary: Missing unit test coverage for CollaboratorInvitationService and acceptCollaboratorInvitation
   evidence: Verification Gap Reviewer identified that these new services/endpoints are currently unexercised by automated unit tests.
+
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-2-invitation-lifecycle-management-resend-revoke-expiry.md
+  summary: Replace hardcoded process.env.FRONTEND_URL with ConfigService
+  evidence: The service directly accesses process.env.FRONTEND_URL instead of using NestJS ConfigService, making it harder to test and validate configuration.
+
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-2-invitation-lifecycle-management-resend-revoke-expiry.md
+  summary: Extract 7-day expiration time into a shared constant or configuration
+  evidence: The 7-day expiration time is a hardcoded magic number in the service.
+
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-2-invitation-lifecycle-management-resend-revoke-expiry.md
+  summary: Distinguish between accepted and revoked invitations in the database
+  evidence: Revoking an invitation currently sets consumedAt, overloading the field used for accepted invitations and causing the UI to display 'consumed_or_revoked'.
+
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-2-invitation-lifecycle-management-resend-revoke-expiry.md
+  summary: Add pagination to listInvitations endpoint
+  evidence: listInvitations uses findMany without skip or take, which will cause memory issues as an organization's invitations grow.
+
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-2-invitation-lifecycle-management-resend-revoke-expiry.md
+  summary: Support resending expired invitations
+  evidence: The resendInvitation query filters out expired invitations, meaning an administrator cannot resend an invitation that has already expired.

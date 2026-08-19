@@ -66,9 +66,11 @@ development_status:
 
   epic-5: in-progress
   5-1-collaborator-invitation-account-activation: review
-  5-2-invitation-lifecycle-management-resend-revoke-expiry: backlog
+  5-2-invitation-lifecycle-management-resend-revoke-expiry: review
   5-3-permission-presets-explicit-grant-management: backlog
   5-4-suspension-reactivation-logical-removal: backlog
   5-5-administrator-promotion-atomic-ownership-transfer: backlog
   epic-5-retrospective: optional
+
+
 

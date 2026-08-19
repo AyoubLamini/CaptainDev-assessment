@@ -1,9 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { EmailService } from '../email/email.service';
 import * as crypto from 'crypto';
 import { EvidenceActions } from '../../common/constants';
 import { InviteCollaboratorDto } from './dto/invite-collaborator.dto';
+import { Prisma } from '@prisma/client';
+
 
 @Injectable()
 export class CollaboratorInvitationService {
@@ -71,7 +73,7 @@ export class CollaboratorInvitationService {
           email,
           tokenHash,
           role: dto.role,
-          grants: dto.grants ? dto.grants : undefined,
+          grants: dto.grants ?? Prisma.JsonNull,
           expiresAt,
         }
       });
@@ -102,4 +104,131 @@ export class CollaboratorInvitationService {
       return { success: true };
     });
   }
+
+  async listInvitations(organizationId: string) {
+    const invitations = await this.prisma.organizationInvitation.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    return invitations.map(inv => ({
+      id: inv.id,
+      email: inv.email,
+      role: inv.role,
+      state: inv.consumedAt ? 'consumed_or_revoked' : (inv.expiresAt < new Date() ? 'expired' : 'pending'),
+      expiresAt: inv.expiresAt,
+      createdAt: inv.createdAt,
+      grants: inv.grants
+    }));
+  }
+
+  async resendInvitation(
+    inviterIdentityId: string,
+    organizationId: string,
+    invitationId: string
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.organizationInvitation.findFirst({
+        where: {
+          id: invitationId,
+          organizationId,
+          consumedAt: null,
+          expiresAt: { gt: new Date() }
+        },
+        include: { organization: true }
+      });
+
+      if (!existing) {
+        throw new NotFoundException('Invitation not found or already consumed');
+      }
+
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Invalidate the old invitation
+      await tx.organizationInvitation.update({
+        where: { id: existing.id },
+        data: { consumedAt: new Date() }
+      });
+
+      // Create new one
+      const newInv = await tx.organizationInvitation.create({
+        data: {
+          organizationId,
+          email: existing.email,
+          tokenHash,
+          role: existing.role,
+          grants: existing.grants ? (existing.grants as Prisma.InputJsonValue) : Prisma.JsonNull,
+          expiresAt,
+        }
+      });
+
+      await this.emailService.queueEmail(
+        tx,
+        organizationId,
+        existing.email,
+        'collaborator-invitation',
+        {
+          organizationName: existing.organization.name,
+          inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invitation?token=${rawToken}`
+        }
+      );
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: inviterIdentityId,
+          action: EvidenceActions.RESEND_INVITATION,
+          reason: `Resent invitation to ${existing.email}`,
+          after: { email: existing.email, invitationId: newInv.id }
+        }
+      });
+
+      return { success: true };
+    });
+  }
+
+  async revokeInvitation(
+    inviterIdentityId: string,
+    organizationId: string,
+    invitationId: string
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.organizationInvitation.findFirst({
+        where: {
+          id: invitationId,
+          organizationId,
+          consumedAt: null,
+          expiresAt: { gt: new Date() }
+        }
+      });
+
+      if (!existing) {
+        throw new NotFoundException('Invitation not found or already consumed');
+      }
+
+      await tx.organizationInvitation.update({
+        where: { id: existing.id },
+        data: { consumedAt: new Date() }
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: inviterIdentityId,
+          action: EvidenceActions.REVOKE_INVITATION,
+          reason: `Revoked invitation for ${existing.email}`,
+          after: { email: existing.email, invitationId: existing.id }
+        }
+      });
+
+      return { success: true };
+    });
+  }
 }
+
+
+
+
