@@ -92,3 +92,7 @@ status: open
 - source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-4-4-responsive-company-scope-administration-ui.md`
   summary: URL interpolation for company/scope paths does not use encodeURIComponent.
   evidence: Review finding: could result in malformed URLs if organizationId or companyId contains unsafe characters.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-1-collaborator-invitation-account-activation.md`
+  summary: Missing unit test coverage for CollaboratorInvitationService and acceptCollaboratorInvitation
+  evidence: Verification Gap Reviewer identified that these new services/endpoints are currently unexercised by automated unit tests.

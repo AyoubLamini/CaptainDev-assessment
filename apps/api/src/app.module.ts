@@ -6,6 +6,7 @@ import { OrgAdminModule } from './modules/org-admin/org-admin.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
 import { EmailModule } from './modules/email/email.module';
 import { EvidenceModule } from './modules/evidence/evidence.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { HealthController } from './modules/health/health.controller';
 import { CsrfGuard } from './common/guards/csrf.guard';
 
@@ -17,6 +18,7 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     AccessControlModule,
     EmailModule,
     EvidenceModule,
+    AuthModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -7,11 +7,24 @@ import { BusinessScopeService } from './business-scope.service';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { DatabaseModule } from '../database/database.module';
+import { EmailModule } from '../email/email.module';
+import { CollaboratorInvitationController } from './collaborator-invitation.controller';
+import { CollaboratorInvitationService } from './collaborator-invitation.service';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [CompanyController, BusinessScopeController, SearchController],
-  providers: [CompanyService, BusinessScopeService, SearchService],
+  imports: [DatabaseModule, EmailModule],
+  controllers: [
+    CompanyController,
+    BusinessScopeController,
+    SearchController,
+    CollaboratorInvitationController,
+  ],
+  providers: [
+    CompanyService,
+    BusinessScopeService,
+    SearchService,
+    CollaboratorInvitationService,
+  ],
   exports: [CompanyService, BusinessScopeService, SearchService],
 })
 export class OrgAdminModule {}
