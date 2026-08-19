@@ -25,27 +25,27 @@ describe('RLS Integration', () => {
 
     // Insert data into both using executeAsTenant to satisfy RLS
     await prisma.executeAsTenant(org1Id, async (tx) => {
-      await tx.organization.create({ data: { id: org1Id } });
-      await tx.company.create({ data: { id: 'comp1', organizationId: org1Id } });
+      await tx.organization.create({ data: { id: org1Id, name: 'Org 1', accessStatus: 'ACTIVE', commercialStatus: 'ACTIVE' } });
+      await tx.company.create({ data: { id: 'comp1', organizationId: org1Id, name: 'Company 1' } });
     });
 
     await prisma.executeAsTenant(org2Id, async (tx) => {
-      await tx.organization.create({ data: { id: org2Id } });
-      await tx.company.create({ data: { id: 'comp2', organizationId: org2Id } });
+      await tx.organization.create({ data: { id: org2Id, name: 'Org 2', accessStatus: 'ACTIVE', commercialStatus: 'ACTIVE' } });
+      await tx.company.create({ data: { id: 'comp2', organizationId: org2Id, name: 'Company 2' } });
     });
 
     // Assert using tenant context 1
     await prisma.executeAsTenant(org1Id, async (tx) => {
       const companies = await tx.company.findMany();
       expect(companies).toHaveLength(1);
-      expect(companies[0].id).toBe('comp1');
+      expect(companies[0]?.id).toBe('comp1');
     });
 
     // Assert using tenant context 2
     await prisma.executeAsTenant(org2Id, async (tx) => {
       const companies = await tx.company.findMany();
       expect(companies).toHaveLength(1);
-      expect(companies[0].id).toBe('comp2');
+      expect(companies[0]?.id).toBe('comp2');
     });
 
     // Assert failing closed (without context)

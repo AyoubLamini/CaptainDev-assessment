@@ -8,19 +8,27 @@
     "test": "cross-env VITE_CONFIG_NATIVE_IGNORE_WARNING=true vitest run",
     "tsc": "tsc --noEmit",
     "lint": "echo \"lint: ok\"",
-    "migrate": "prisma migrate dev"
+    "migrate": "prisma migrate dev",
+    "prisma": "prisma",
+    "bootstrap": "ts-node scripts/bootstrap.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@prisma/client": "^5.22.0",
+    "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.6",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "resend": "^6.20.0",
+    "rxjs": "^7.8.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.2.1",
+    "@types/cookie-parser": "^1.4.7",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^4.1.10",
@@ -29,5 +37,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "vitest": "^4.1.10"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

@@ -9,7 +9,8 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "incremental": true,
-    "tsBuildInfoFile": ".tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

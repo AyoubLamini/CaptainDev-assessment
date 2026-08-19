@@ -4,6 +4,10 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "typecheck": "pnpm -r tsc --noEmit",
     "test": "pnpm -r test",

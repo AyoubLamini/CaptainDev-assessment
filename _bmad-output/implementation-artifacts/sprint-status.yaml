@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 08-16-2026 15:00
-last_updated: 08-17-2026
+last_updated: 2026-08-19
 project: CaptainDevAssessment
 project_key: NOKEY
 tracking_system: file-system
@@ -37,31 +37,31 @@ story_location:
   c:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts
 development_status:
   epic-1: in-progress
-  1-1-monorepo-skeleton-with-module-boundaries: review
-  1-2-database-schema-migrations-forced-postgresql-rls: review
-  1-3-transactional-email-adapter: backlog
-  1-4-ci-pipeline-test-harness-synthetic-seed-data: backlog
+  1-1-monorepo-skeleton-with-module-boundaries: done
+  1-2-database-schema-migrations-forced-postgresql-rls: done
+  1-3-transactional-email-adapter: done
+  1-4-ci-pipeline-test-harness-synthetic-seed-data: done
   epic-1-retrospective: optional
 
   epic-2: backlog
-  2-1-platform-administrator-secure-bootstrap: backlog
-  2-2-email-password-login-server-side-session: backlog
-  2-3-csrf-protection-session-rotation: backlog
-  2-4-neutral-password-reset-flow: backlog
+  2-1-platform-administrator-secure-bootstrap: done
+  2-2-email-password-login-server-side-session: done
+  2-3-csrf-protection-session-rotation: done
+  2-4-neutral-password-reset-flow: done
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-organization-provisioning-platform-directory: backlog
-  3-2-initial-owner-invitation-organization-activation: backlog
-  3-3-commercial-status-access-status-management: backlog
-  3-4-terminal-disablement-narrowly-scoped-platform-interventions: backlog
+  epic-3: done
+  3-1-organization-provisioning-platform-directory: done
+  3-2-initial-owner-invitation-organization-activation: done
+  3-3-commercial-status-access-status-management: done
+  3-4-terminal-disablement-narrowly-scoped-platform-interventions: done
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-company-management-create-edit-deactivate: backlog
-  4-2-guided-business-scope-creation-flow: backlog
-  4-3-authorized-company-scope-search: backlog
-  4-4-responsive-company-scope-administration-ui: backlog
+  epic-4: in-progress
+  4-1-company-management-create-edit-deactivate: done
+  4-2-guided-business-scope-creation-flow: done
+  4-3-authorized-company-scope-search: done
+  4-4-responsive-company-scope-administration-ui: review
   epic-4-retrospective: optional
 
   epic-5: backlog
@@ -71,3 +71,4 @@ development_status:
   5-4-suspension-reactivation-logical-removal: backlog
   5-5-administrator-promotion-atomic-ownership-transfer: backlog
   epic-5-retrospective: optional
+
