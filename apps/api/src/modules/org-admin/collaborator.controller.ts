@@ -1,0 +1,47 @@
+import { Controller, Get, Patch, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { CollaboratorService } from './collaborator.service';
+import { UpdateCollaboratorGrantsDto } from './dto/update-collaborator-grants.dto';
+import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
+import { Request } from 'express';
+
+interface AuthenticatedRequest extends Request {
+  identity: { id: string; [key: string]: any };
+  session?: { createdAt: any; [key: string]: any };
+}
+
+@Controller('organizations/:organizationId/collaborators')
+@UseGuards(OrgAdminGuard)
+export class CollaboratorController {
+  constructor(private readonly collaboratorService: CollaboratorService) {}
+
+  @Get(':id')
+  async getCollaborator(
+    @Param('organizationId') organizationId: string,
+    @Param('id') id: string
+  ) {
+    const collaborator = await this.collaboratorService.getCollaborator(organizationId, id);
+    return { data: collaborator };
+  }
+
+  @Patch(':id/grants')
+  @HttpCode(HttpStatus.OK)
+  async updateGrants(
+    @Param('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateCollaboratorGrantsDto,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const adminIdentityId = req.identity.id;
+    const sessionCreatedAt = req.session?.createdAt;
+
+    const updated = await this.collaboratorService.updateCollaboratorGrants(
+      organizationId,
+      id,
+      adminIdentityId,
+      dto,
+      sessionCreatedAt
+    );
+
+    return { data: updated };
+  }
+}

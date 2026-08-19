@@ -116,3 +116,9 @@ status: open
 - source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-2-invitation-lifecycle-management-resend-revoke-expiry.md
   summary: Support resending expired invitations
   evidence: The resendInvitation query filters out expired invitations, meaning an administrator cannot resend an invitation that has already expired.
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-3-permission-presets-explicit-grant-management.md
+  summary: Add output data sanitization (Response DTOs) to getCollaborator.
+  evidence: Reviewers flagged that getCollaborator returns raw Prisma database models directly, exposing internal fields without serialization.
+- source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-3-permission-presets-explicit-grant-management.md
+  summary: Add OpenAPI/Swagger documentation decorators to CollaboratorController.
+  evidence: The newly added endpoints lack @ApiOperation and @ApiResponse, omitting them from generated documentation.

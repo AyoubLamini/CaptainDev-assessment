@@ -46,8 +46,9 @@ export class OrgAdminGuard implements CanActivate {
       throw new ForbiddenException('Organization Administrator access required');
     }
 
-    // Attach identity and organizationId to request
+    // Attach identity, session, and organizationId to request
     (request as any).identity = session.identity;
+    (request as any).session = session;
     (request as any).organizationId = organizationId;
 
     return true;
