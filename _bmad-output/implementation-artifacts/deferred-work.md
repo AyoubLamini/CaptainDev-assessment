@@ -122,3 +122,18 @@ status: open
 - source_spec: C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-3-permission-presets-explicit-grant-management.md
   summary: Add OpenAPI/Swagger documentation decorators to CollaboratorController.
   evidence: The newly added endpoints lack @ApiOperation and @ApiResponse, omitting them from generated documentation.
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-4-suspension-reactivation-logical-removal.md`
+  summary: Missing OpenAPI Swagger decorators for update status endpoints.
+  evidence: The `UpdateCollaboratorStatusDto` class lacks `@ApiProperty()` decorators.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-4-suspension-reactivation-logical-removal.md`
+  summary: Missing Step-Up Auth check for member reactivation.
+  evidence: Reactivating a highly privileged member (like an ADMIN or OWNER) is a sensitive action but does not enforce recent authentication.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-4-suspension-reactivation-logical-removal.md`
+  summary: Inconsistent legacy member active checks.
+  evidence: Removed check for legacy roles, which may silently enable legacy disabled accounts if not properly migrated.
+
+- source_spec: `C:\Users\ayoub\OneDrive\Desktop\CaptainDevSubmit\_bmad-output\implementation-artifacts\spec-5-4-suspension-reactivation-logical-removal.md`
+  summary: Missing test assertions for exact edge cases in updateCollaboratorStatus.
+  evidence: Need tests for REMOVED status revocation, ADMIN last-active block, and OWNER allowed in guard.

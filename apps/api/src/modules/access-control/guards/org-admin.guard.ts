@@ -42,8 +42,12 @@ export class OrgAdminGuard implements CanActivate {
       }
     });
 
-    if (!membership || membership.role !== 'ADMIN') {
-      throw new ForbiddenException('Organization Administrator access required');
+    if (!membership || (membership.role !== 'ADMIN' && membership.role !== 'OWNER')) {
+      throw new ForbiddenException('Organization Administrator or Owner access required');
+    }
+
+    if (membership.status !== 'ACTIVE') {
+      throw new ForbiddenException('Member is not active');
     }
 
     // Attach identity, session, and organizationId to request

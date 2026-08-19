@@ -12,9 +12,13 @@ describe('CollaboratorService', () => {
     organizationMember: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
     },
     businessScope: {
       findMany: vi.fn(),
+    },
+    session: {
+      deleteMany: vi.fn(),
     },
     evidence: {
       create: vi.fn(),
@@ -76,6 +80,7 @@ describe('CollaboratorService', () => {
         id: 'mem_1',
         organizationId: 'org_1',
         identityId: 'other_user',
+        status: 'ACTIVE',
         grants: oldGrants,
       });
       mockPrismaService.businessScope.findMany.mockResolvedValue([{ id: 'scope_1' }]);
@@ -101,6 +106,7 @@ describe('CollaboratorService', () => {
         id: 'mem_1',
         organizationId: 'org_1',
         identityId: 'admin_1',
+        status: 'ACTIVE',
       });
       await expect(service.updateCollaboratorGrants('org_1', 'mem_1', 'admin_1', { grants: { capabilities: [], scopes: [] } }, new Date()))
         .rejects.toThrow(ForbiddenException);
@@ -111,6 +117,7 @@ describe('CollaboratorService', () => {
         id: 'mem_1',
         organizationId: 'org_1',
         identityId: 'other_user',
+        status: 'ACTIVE',
       });
       // Simulate finding only 1 out of 2 scopes
       mockPrismaService.businessScope.findMany.mockResolvedValue([{ id: 'scope_1' }]);
@@ -125,6 +132,7 @@ describe('CollaboratorService', () => {
         id: 'mem_1',
         organizationId: 'org_1',
         identityId: 'other_user',
+        status: 'ACTIVE',
         grants: oldGrants,
       });
       mockPrismaService.businessScope.findMany.mockResolvedValue([{ id: 'scope_1' }, { id: 'scope_2' }]);
@@ -155,6 +163,7 @@ describe('CollaboratorService', () => {
         id: 'mem_1',
         organizationId: 'org_1',
         identityId: 'other_user',
+        status: 'ACTIVE',
         grants: oldGrants,
       });
       mockPrismaService.businessScope.findMany.mockResolvedValue([{ id: 'scope_1' }]);
@@ -165,6 +174,89 @@ describe('CollaboratorService', () => {
 
       await expect(service.updateCollaboratorGrants('org_1', 'mem_1', 'admin_1', { grants: newGrants }, staleDate))
         .rejects.toThrow(ForbiddenException); // Recent auth required
+    });
+  });
+
+  describe('updateCollaboratorStatus', () => {
+    it('should throw NotFoundException if member not found', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue(null);
+      await expect(service.updateCollaboratorStatus('org_1', 'mem_1', 'admin_1', 'SUSPENDED', new Date()))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if member is REMOVED', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'user_1',
+        status: 'REMOVED'
+      });
+      await expect(service.updateCollaboratorStatus('org_1', 'mem_1', 'admin_1', 'SUSPENDED', new Date()))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ForbiddenException if admin updates their own status', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'admin_1',
+        status: 'ACTIVE'
+      });
+      await expect(service.updateCollaboratorStatus('org_1', 'mem_1', 'admin_1', 'SUSPENDED', new Date()))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('should update status and revoke sessions', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'user_1',
+        status: 'ACTIVE',
+        role: 'MEMBER'
+      });
+      mockPrismaService.organizationMember.update.mockResolvedValue({ id: 'mem_1' });
+      mockPrismaService.evidence.create.mockResolvedValue({});
+      mockPrismaService.session.deleteMany.mockResolvedValue({});
+      
+      const freshDate = new Date();
+      await service.updateCollaboratorStatus('org_1', 'mem_1', 'admin_1', 'SUSPENDED', freshDate);
+
+      expect(mockPrismaService.organizationMember.update).toHaveBeenCalledWith({
+        where: { id: 'mem_1' },
+        data: { status: 'SUSPENDED' },
+      });
+      expect(mockPrismaService.session.deleteMany).toHaveBeenCalledWith({
+        where: { identityId: 'user_1' }
+      });
+    });
+
+    it('should reject suspending the last active owner', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'user_1',
+        status: 'ACTIVE',
+        role: 'OWNER'
+      });
+      mockPrismaService.organizationMember.count.mockResolvedValue(1);
+
+      const freshDate = new Date();
+      await expect(service.updateCollaboratorStatus('org_1', 'mem_1', 'admin_1', 'SUSPENDED', freshDate))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('should require recent auth for suspension', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'user_1',
+        status: 'ACTIVE',
+        role: 'MEMBER'
+      });
+      const staleDate = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes old
+
+      await expect(service.updateCollaboratorStatus('org_1', 'mem_1', 'admin_1', 'SUSPENDED', staleDate))
+        .rejects.toThrow(ForbiddenException);
     });
   });
 });

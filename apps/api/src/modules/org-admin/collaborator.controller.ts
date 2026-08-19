@@ -9,6 +9,8 @@ interface AuthenticatedRequest extends Request {
   session?: { createdAt: any; [key: string]: any };
 }
 
+import { UpdateCollaboratorStatusDto } from './dto/update-collaborator-status.dto';
+
 @Controller('organizations/:organizationId/collaborators')
 @UseGuards(OrgAdminGuard)
 export class CollaboratorController {
@@ -39,6 +41,28 @@ export class CollaboratorController {
       id,
       adminIdentityId,
       dto,
+      sessionCreatedAt
+    );
+
+    return { data: updated };
+  }
+
+  @Patch(':id/status')
+  @HttpCode(HttpStatus.OK)
+  async updateStatus(
+    @Param('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateCollaboratorStatusDto,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const adminIdentityId = req.identity.id;
+    const sessionCreatedAt = req.session?.createdAt;
+
+    const updated = await this.collaboratorService.updateCollaboratorStatus(
+      organizationId,
+      id,
+      adminIdentityId,
+      dto.status,
       sessionCreatedAt
     );
 

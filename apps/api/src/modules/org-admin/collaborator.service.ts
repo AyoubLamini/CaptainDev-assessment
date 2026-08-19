@@ -28,7 +28,7 @@ export class CollaboratorService {
       throw new NotFoundException('Collaborator not found');
     }
 
-    if ((member as any).status === 'INACTIVE' || member.role === 'DISABLED' || member.role === 'INACTIVE') {
+    if (member.status !== 'ACTIVE') {
       throw new BadRequestException('Inactive member');
     }
 
@@ -50,7 +50,7 @@ export class CollaboratorService {
       throw new NotFoundException('Collaborator not found');
     }
 
-    if ((member as any).status === 'INACTIVE' || member.role === 'DISABLED' || member.role === 'INACTIVE') {
+    if (member.status !== 'ACTIVE') {
       throw new BadRequestException('Inactive member');
     }
 
@@ -125,5 +125,89 @@ export class CollaboratorService {
     }
     
     return false;
+  }
+
+  async updateCollaboratorStatus(
+    organizationId: string,
+    memberId: string,
+    adminIdentityId: string,
+    status: import('@prisma/client').OrganizationMemberStatus,
+    sessionCreatedAt: Date | undefined
+  ) {
+    const member = await this.prisma.organizationMember.findUnique({
+      where: { id: memberId },
+    });
+
+    if (!member || member.organizationId !== organizationId) {
+      throw new NotFoundException('Collaborator not found');
+    }
+
+    if (member.status === 'REMOVED') {
+      throw new BadRequestException('Cannot change status of a removed member');
+    }
+    
+    if (status === member.status) {
+      return member;
+    }
+
+    if (member.identityId === adminIdentityId) {
+      throw new ForbiddenException('Administrators cannot change their own status');
+    }
+
+    if (status === 'SUSPENDED' || status === 'REMOVED') {
+      verifyRecentAuth(sessionCreatedAt, 15);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (status === 'SUSPENDED' || status === 'REMOVED') {
+        if (member.role === 'OWNER') {
+          const activeOwnersCount = await tx.organizationMember.count({
+            where: { organizationId, role: 'OWNER', status: 'ACTIVE' }
+          });
+          if (activeOwnersCount <= 1) {
+            throw new BadRequestException('Cannot suspend or remove the last active owner');
+          }
+        }
+
+        if (member.role === 'ADMIN') {
+          const activeAdminsCount = await tx.organizationMember.count({
+            where: { organizationId, role: 'ADMIN', status: 'ACTIVE' }
+          });
+          if (activeAdminsCount <= 1) {
+            throw new BadRequestException('Cannot suspend or remove the last active administrator');
+          }
+        }
+      }
+
+      const updatedMember = await tx.organizationMember.update({
+        where: { id: memberId },
+        data: { status },
+      });
+
+      let evidenceAction = '';
+      if (status === 'SUSPENDED') evidenceAction = EvidenceActions.SUSPEND_COLLABORATOR;
+      else if (status === 'ACTIVE') evidenceAction = EvidenceActions.REACTIVATE_COLLABORATOR;
+      else if (status === 'REMOVED') evidenceAction = EvidenceActions.REMOVE_COLLABORATOR;
+      else evidenceAction = 'UPDATE_COLLABORATOR_STATUS';
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: adminIdentityId,
+          action: evidenceAction,
+          reason: `Administrator updated status to ${status}`,
+          before: { status: member.status },
+          after: { status },
+        }
+      });
+
+      if (status === 'SUSPENDED' || status === 'REMOVED') {
+        await tx.session.deleteMany({
+          where: { identityId: member.identityId },
+        });
+      }
+
+      return updatedMember;
+    });
   }
 }

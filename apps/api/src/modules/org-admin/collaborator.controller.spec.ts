@@ -65,4 +65,27 @@ describe('CollaboratorController', () => {
       expect(result).toEqual({ data: { id: 'mem_1', grants: dto.grants } });
     });
   });
+
+  describe('updateStatus', () => {
+    it('should call service and return updated data', async () => {
+      const mockReq = {
+        identity: { id: 'admin_1' },
+        session: { createdAt: new Date() },
+      };
+      const dto: any = { status: 'SUSPENDED' };
+      
+      mockCollaboratorService.updateCollaboratorStatus = vi.fn().mockResolvedValue({ id: 'mem_1', status: 'SUSPENDED' });
+      
+      const result = await controller.updateStatus('org_1', 'mem_1', dto, mockReq as any);
+      
+      expect(mockCollaboratorService.updateCollaboratorStatus).toHaveBeenCalledWith(
+        'org_1',
+        'mem_1',
+        'admin_1',
+        'SUSPENDED',
+        mockReq.session.createdAt
+      );
+      expect(result).toEqual({ data: { id: 'mem_1', status: 'SUSPENDED' } });
+    });
+  });
 });
