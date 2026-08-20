@@ -210,4 +210,256 @@ export class CollaboratorService {
       return updatedMember;
     });
   }
+
+  async promoteCollaborator(
+    organizationId: string,
+    memberId: string,
+    adminIdentityId: string,
+    reason: string,
+    sessionCreatedAt: any
+  ) {
+    verifyRecentAuth(sessionCreatedAt, 15);
+
+    return this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationMember.findUnique({
+        where: { id: memberId },
+      });
+
+      if (!member || member.organizationId !== organizationId) {
+        throw new NotFoundException('Collaborator not found');
+      }
+
+      if (member.status !== 'ACTIVE') {
+        throw new BadRequestException('Inactive member');
+      }
+
+      if (member.identityId === adminIdentityId) {
+        throw new BadRequestException('Cannot promote yourself');
+      }
+
+      if (member.role === 'ADMIN' || member.role === 'OWNER') {
+        throw new BadRequestException('Member is already an admin or owner');
+      }
+
+      const updatedMember = await tx.organizationMember.update({
+        where: { id: memberId },
+        data: { role: 'ADMIN' },
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: adminIdentityId,
+          action: EvidenceActions.PROMOTE_COLLABORATOR,
+          reason,
+          before: { role: member.role },
+          after: { role: 'ADMIN' },
+        }
+      });
+
+      return updatedMember;
+    });
+  }
+
+  async proposeOwnershipTransfer(
+    organizationId: string,
+    adminIdentityId: string,
+    successorMemberId: string,
+    sessionCreatedAt: any
+  ) {
+    verifyRecentAuth(sessionCreatedAt, 15);
+
+    return this.prisma.$transaction(async (tx) => {
+      const ownerMember = await tx.organizationMember.findUnique({
+        where: { organizationId_identityId: { organizationId, identityId: adminIdentityId } }
+      });
+
+      if (!ownerMember || ownerMember.role !== 'OWNER' || ownerMember.status !== 'ACTIVE') {
+        throw new ForbiddenException('Only the active organization owner can propose a transfer');
+      }
+
+      const successor = await tx.organizationMember.findUnique({
+        where: { id: successorMemberId }
+      });
+
+      if (!successor || successor.organizationId !== organizationId) {
+        throw new NotFoundException('Successor member not found');
+      }
+
+      if (successor.status !== 'ACTIVE' || successor.role !== 'ADMIN') {
+        throw new BadRequestException('Successor must be an active administrator');
+      }
+
+      if (successor.identityId === adminIdentityId) {
+        throw new BadRequestException('Cannot transfer ownership to yourself');
+      }
+
+      const existingActiveProposals = await tx.ownershipTransferProposal.findMany({
+        where: {
+          organizationId,
+          status: 'PENDING',
+          expiresAt: { gt: new Date() }
+        }
+      });
+
+      if (existingActiveProposals.length > 0) {
+        throw new BadRequestException('An active ownership transfer proposal already exists');
+      }
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const proposal = await tx.ownershipTransferProposal.create({
+        data: {
+          organizationId,
+          proposerId: ownerMember.id,
+          successorId: successor.id,
+          status: 'PENDING',
+          expiresAt,
+        }
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: adminIdentityId,
+          action: EvidenceActions.PROPOSE_OWNERSHIP_TRANSFER,
+          reason: 'Owner proposed ownership transfer',
+          before: {},
+          after: { proposalId: proposal.id, successorId: successor.id },
+        }
+      });
+
+      return proposal;
+    });
+  }
+
+  async acceptOwnershipTransfer(
+    organizationId: string,
+    adminIdentityId: string,
+    sessionCreatedAt: any
+  ) {
+    verifyRecentAuth(sessionCreatedAt, 15);
+
+    return this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationMember.findUnique({
+        where: { organizationId_identityId: { organizationId, identityId: adminIdentityId } }
+      });
+
+      if (!member) {
+        throw new ForbiddenException('Member not found');
+      }
+
+      const proposals = await tx.ownershipTransferProposal.findMany({
+        where: { organizationId, status: 'PENDING' },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      const proposal = proposals[0];
+
+      if (!proposal) {
+        throw new NotFoundException('No pending proposal found');
+      }
+
+      if (proposal.successorId !== member.id) {
+        throw new ForbiddenException('You are not the designated successor');
+      }
+
+      if (proposal.expiresAt < new Date()) {
+        throw new BadRequestException('Proposal has expired');
+      }
+
+      const proposer = await tx.organizationMember.findUnique({
+        where: { id: proposal.proposerId }
+      });
+
+      if (!proposer || proposer.role !== 'OWNER' || proposer.status !== 'ACTIVE') {
+        throw new BadRequestException('Proposer is no longer the active owner');
+      }
+
+      if (member.role !== 'ADMIN' || member.status !== 'ACTIVE') {
+        throw new BadRequestException('Successor is no longer an active administrator');
+      }
+
+      await tx.organizationMember.update({
+        where: { id: proposer.id },
+        data: { role: 'ADMIN' }
+      });
+
+      await tx.organizationMember.update({
+        where: { id: member.id },
+        data: { role: 'OWNER' }
+      });
+
+      const updatedProposal = await tx.ownershipTransferProposal.update({
+        where: { id: proposal.id },
+        data: { status: 'ACCEPTED' }
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: adminIdentityId,
+          action: EvidenceActions.ACCEPT_OWNERSHIP_TRANSFER,
+          reason: 'Successor accepted ownership transfer',
+          before: { proposerRole: 'OWNER', successorRole: 'ADMIN', proposalStatus: 'PENDING' },
+          after: { proposerRole: 'ADMIN', successorRole: 'OWNER', proposalStatus: 'ACCEPTED' },
+        }
+      });
+
+      return updatedProposal;
+    });
+  }
+
+  async cancelOwnershipTransfer(
+    organizationId: string,
+    adminIdentityId: string,
+    sessionCreatedAt: any
+  ) {
+    verifyRecentAuth(sessionCreatedAt, 15);
+
+    return this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationMember.findUnique({
+        where: { organizationId_identityId: { organizationId, identityId: adminIdentityId } }
+      });
+
+      if (!member || member.role !== 'OWNER') {
+        throw new ForbiddenException('Only the owner can cancel a transfer proposal');
+      }
+
+      const proposals = await tx.ownershipTransferProposal.findMany({
+        where: { organizationId, status: 'PENDING' },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      const proposal = proposals[0];
+      if (!proposal) {
+        throw new NotFoundException('No pending proposal found');
+      }
+
+      if (proposal.expiresAt < new Date()) {
+        throw new BadRequestException('Proposal expired');
+      }
+
+      const updatedProposal = await tx.ownershipTransferProposal.update({
+        where: { id: proposal.id },
+        data: { status: 'CANCELLED' }
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId,
+          actorId: adminIdentityId,
+          action: EvidenceActions.CANCEL_OWNERSHIP_TRANSFER,
+          reason: 'Owner cancelled ownership transfer proposal',
+          before: { proposalStatus: 'PENDING' },
+          after: { proposalStatus: 'CANCELLED' },
+        }
+      });
+
+      return updatedProposal;
+    });
+  }
+
+
 }

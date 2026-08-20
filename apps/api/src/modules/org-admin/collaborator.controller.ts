@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { CollaboratorService } from './collaborator.service';
 import { UpdateCollaboratorGrantsDto } from './dto/update-collaborator-grants.dto';
 import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
@@ -23,6 +23,29 @@ export class CollaboratorController {
   ) {
     const collaborator = await this.collaboratorService.getCollaborator(organizationId, id);
     return { data: collaborator };
+  }
+
+
+  @Post(':id/promote')
+  @HttpCode(HttpStatus.OK)
+  async promoteCollaborator(
+    @Param('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: import('./dto/promote-collaborator.dto').PromoteCollaboratorDto,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const adminIdentityId = req.identity.id;
+    const sessionCreatedAt = req.session?.createdAt;
+
+    const result = await this.collaboratorService.promoteCollaborator(
+      organizationId,
+      id,
+      adminIdentityId,
+      dto.reason,
+      sessionCreatedAt
+    );
+
+    return { data: result };
   }
 
   @Patch(':id/grants')

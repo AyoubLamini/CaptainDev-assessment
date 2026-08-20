@@ -45,12 +45,13 @@ model Organization {
   createdAt        DateTime                     @default(now()) @map("created_at")
   updatedAt        DateTime                     @updatedAt @map("updated_at")
 
-  companies     Company[]
-  scopes        BusinessScope[]
-  evidence      Evidence[]
-  emailOutboxes EmailOutbox[]
-  invitations   OrganizationInvitation[]
-  members       OrganizationMember[]
+  companies                  Company[]
+  scopes                     BusinessScope[]
+  evidence                   Evidence[]
+  emailOutboxes              EmailOutbox[]
+  invitations                OrganizationInvitation[]
+  members                    OrganizationMember[]
+  ownershipTransferProposals OwnershipTransferProposal[]
 
   @@map("organization")
 }
@@ -201,9 +202,37 @@ model OrganizationMember {
   createdAt      DateTime                 @default(now()) @map("created_at")
   updatedAt      DateTime                 @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  identity     Identity     @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  organization       Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  identity           Identity                    @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  proposedTransfers  OwnershipTransferProposal[] @relation("ProposalProposer")
+  successorTransfers OwnershipTransferProposal[] @relation("ProposalSuccessor")
 
   @@unique([organizationId, identityId])
   @@map("organization_member")
+}
+
+enum OwnershipTransferProposalStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  EXPIRED
+
+  @@map("ownership_transfer_proposal_status")
+}
+
+model OwnershipTransferProposal {
+  id             String                          @id @default(uuid())
+  organizationId String                          @map("organization_id")
+  proposerId     String                          @map("proposer_id")
+  successorId    String                          @map("successor_id")
+  status         OwnershipTransferProposalStatus @default(PENDING)
+  expiresAt      DateTime                        @map("expires_at")
+  createdAt      DateTime                        @default(now()) @map("created_at")
+  updatedAt      DateTime                        @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  proposer     OrganizationMember @relation("ProposalProposer", fields: [proposerId], references: [id], onDelete: Cascade)
+  successor    OrganizationMember @relation("ProposalSuccessor", fields: [successorId], references: [id], onDelete: Cascade)
+
+  @@map("ownership_transfer_proposal")
 }

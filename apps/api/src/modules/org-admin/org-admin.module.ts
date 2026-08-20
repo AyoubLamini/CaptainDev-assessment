@@ -12,6 +12,7 @@ import { CollaboratorInvitationController } from './collaborator-invitation.cont
 import { CollaboratorInvitationService } from './collaborator-invitation.service';
 import { CollaboratorController } from './collaborator.controller';
 import { CollaboratorService } from './collaborator.service';
+import { OwnershipTransferController } from './ownership-transfer.controller';
 
 @Module({
   imports: [DatabaseModule, EmailModule],
@@ -21,6 +22,7 @@ import { CollaboratorService } from './collaborator.service';
     SearchController,
     CollaboratorInvitationController,
     CollaboratorController,
+    OwnershipTransferController,
   ],
   providers: [
     CompanyService,

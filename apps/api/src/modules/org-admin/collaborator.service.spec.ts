@@ -23,6 +23,11 @@ describe('CollaboratorService', () => {
     evidence: {
       create: vi.fn(),
     },
+    ownershipTransferProposal: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
     $transaction: vi.fn(async (cb) => {
       return cb(mockPrismaService);
     }),
@@ -259,4 +264,123 @@ describe('CollaboratorService', () => {
         .rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('promoteCollaborator', () => {
+    it('should promote an active member to ADMIN and log evidence', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'user_1',
+        status: 'ACTIVE',
+        role: 'MEMBER'
+      });
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      mockPrismaService.organizationMember.update.mockResolvedValue({ id: 'mem_1', role: 'ADMIN' });
+      
+      const result = await service.promoteCollaborator('org_1', 'mem_1', 'admin_1', 'reason', new Date());
+      expect(result).toBeDefined();
+    });
+
+    it('should reject self-promotion', async () => {
+      mockPrismaService.organizationMember.findUnique.mockResolvedValue({
+        id: 'mem_1',
+        organizationId: 'org_1',
+        identityId: 'admin_1',
+        status: 'ACTIVE',
+        role: 'MEMBER'
+      });
+      await expect(service.promoteCollaborator('org_1', 'mem_1', 'admin_1', 'reason', new Date()))
+        .rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('proposeOwnershipTransfer', () => {
+    it('should create proposal if current owner proposes to active admin', async () => {
+      mockPrismaService.organizationMember.findUnique.mockImplementation(async ({ where }) => {
+        if (where.organizationId_identityId) return { id: 'owner_1', role: 'OWNER', status: 'ACTIVE' };
+        if (where.id === 'succ_1') return { id: 'succ_1', role: 'ADMIN', status: 'ACTIVE', organizationId: 'org_1' };
+        return null;
+      });
+      mockPrismaService.ownershipTransferProposal.findMany.mockResolvedValue([]);
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      mockPrismaService.ownershipTransferProposal.create.mockResolvedValue({ id: 'prop_1' });
+      
+      const result = await service.proposeOwnershipTransfer('org_1', 'admin_1', 'succ_1', new Date());
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('acceptOwnershipTransfer', () => {
+    it('should accept valid proposal and swap roles', async () => {
+      mockPrismaService.organizationMember.findUnique.mockImplementation(async ({ where }) => {
+        if (where.organizationId_identityId) return { id: 'succ_1', role: 'ADMIN', status: 'ACTIVE' };
+        if (where.id === 'owner_1') return { id: 'owner_1', role: 'OWNER', status: 'ACTIVE' };
+        return null;
+      });
+      mockPrismaService.ownershipTransferProposal.findMany.mockResolvedValue([
+        { id: 'prop_1', successorId: 'succ_1', proposerId: 'owner_1', status: 'PENDING', expiresAt: new Date(Date.now() + 100000) }
+      ]);
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      
+      await service.acceptOwnershipTransfer('org_1', 'admin_1', new Date());
+      expect(mockPrismaService.organizationMember.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('should reject if proposal is expired', async () => {
+      mockPrismaService.organizationMember.findUnique.mockImplementation(async ({ where }) => {
+        if (where.organizationId_identityId) return { id: 'succ_1', role: 'ADMIN', status: 'ACTIVE' };
+        return null;
+      });
+      mockPrismaService.ownershipTransferProposal.findMany.mockResolvedValue([
+        { id: 'prop_1', successorId: 'succ_1', proposerId: 'owner_1', status: 'PENDING', expiresAt: new Date(Date.now() - 100000) }
+      ]);
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      
+      await expect(service.acceptOwnershipTransfer('org_1', 'admin_1', new Date()))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject if non-designated successor attempts to accept', async () => {
+      mockPrismaService.organizationMember.findUnique.mockImplementation(async ({ where }) => {
+        if (where.organizationId_identityId) return { id: 'other_admin', role: 'ADMIN', status: 'ACTIVE' };
+        return null;
+      });
+      mockPrismaService.ownershipTransferProposal.findMany.mockResolvedValue([
+        { id: 'prop_1', successorId: 'succ_1', proposerId: 'owner_1', status: 'PENDING', expiresAt: new Date(Date.now() + 100000) }
+      ]);
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      
+      await expect(service.acceptOwnershipTransfer('org_1', 'admin_1', new Date()))
+        .rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('cancelOwnershipTransfer', () => {
+    it('should reject if actor is not the owner', async () => {
+      mockPrismaService.organizationMember.findUnique.mockImplementation(async ({ where }) => {
+        if (where.organizationId_identityId) return { id: 'admin_1', role: 'ADMIN', status: 'ACTIVE' };
+        return null;
+      });
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      
+      await expect(service.cancelOwnershipTransfer('org_1', 'admin_1', new Date()))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('should successfully cancel the proposal if actor is owner', async () => {
+      mockPrismaService.organizationMember.findUnique.mockImplementation(async ({ where }) => {
+        if (where.organizationId_identityId) return { id: 'owner_1', role: 'OWNER', status: 'ACTIVE' };
+        return null;
+      });
+      mockPrismaService.ownershipTransferProposal.findMany.mockResolvedValue([
+        { id: 'prop_1', successorId: 'succ_1', proposerId: 'owner_1', status: 'PENDING', expiresAt: new Date(Date.now() + 100000) }
+      ]);
+      mockPrismaService.ownershipTransferProposal.update.mockResolvedValue({ id: 'prop_1', status: 'CANCELLED' });
+      mockPrismaService.$transaction.mockImplementation(async (cb) => cb(mockPrismaService));
+      
+      const result = await service.cancelOwnershipTransfer('org_1', 'owner_1', new Date());
+      expect(result.status).toBe('CANCELLED');
+    });
+  });
 });
+

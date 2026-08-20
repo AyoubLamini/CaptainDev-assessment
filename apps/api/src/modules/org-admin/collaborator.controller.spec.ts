@@ -88,4 +88,27 @@ describe('CollaboratorController', () => {
       expect(result).toEqual({ data: { id: 'mem_1', status: 'SUSPENDED' } });
     });
   });
+
+  describe('promoteCollaborator', () => {
+    it('should call service and return updated data', async () => {
+      const mockReq = {
+        identity: { id: 'admin_1' },
+        session: { createdAt: new Date() },
+      };
+      const dto: any = { reason: 'Great work' };
+      
+      mockCollaboratorService.promoteCollaborator = vi.fn().mockResolvedValue({ id: 'mem_1', role: 'ADMIN' });
+      
+      const result = await controller.promoteCollaborator('org_1', 'mem_1', dto, mockReq as any);
+      
+      expect(mockCollaboratorService.promoteCollaborator).toHaveBeenCalledWith(
+        'org_1',
+        'mem_1',
+        'admin_1',
+        dto.reason,
+        mockReq.session.createdAt
+      );
+      expect(result).toEqual({ data: { id: 'mem_1', role: 'ADMIN' } });
+    });
+  });
 });

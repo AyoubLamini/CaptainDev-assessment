@@ -69,5 +69,5 @@ development_status:
   5-2-invitation-lifecycle-management-resend-revoke-expiry: review
   5-3-permission-presets-explicit-grant-management: review
   5-4-suspension-reactivation-logical-removal: review
-  5-5-administrator-promotion-atomic-ownership-transfer: backlog
+  5-5-administrator-promotion-atomic-ownership-transfer: review
   epic-5-retrospective: optional
