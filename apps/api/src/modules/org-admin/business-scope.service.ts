@@ -43,27 +43,29 @@ export class BusinessScopeService {
     if (typeof params.location === 'string') payload.location = params.location.trim();
     if (typeof params.responsiblePerson === 'string') payload.responsiblePerson = params.responsiblePerson.trim();
 
-    try {
-      return await this.prisma.businessScope.create({
-        data: payload,
-      });
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        const existingScope = await this.prisma.businessScope.findFirst({
-          where: {
-            organizationId,
-            companyId,
-            type,
-            name: name.trim(),
-            externalId: payload.externalId || '',
-          },
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      try {
+        return await tx.businessScope.create({
+          data: payload,
         });
-        throw new ConflictException({
-          message: 'A Business Scope with these details already exists.',
-          scope: existingScope,
-        });
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          const existingScope = await tx.businessScope.findFirst({
+            where: {
+              organizationId,
+              companyId,
+              type,
+              name: name.trim(),
+              externalId: payload.externalId || '',
+            },
+          });
+          throw new ConflictException({
+            message: 'A Business Scope with these details already exists.',
+            scope: existingScope,
+          });
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 }

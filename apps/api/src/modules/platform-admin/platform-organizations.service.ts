@@ -6,6 +6,7 @@ import { DisableOrganizationDto } from './dto/disable-organization.dto';
 import { PlatformInterventionDto } from './dto/platform-intervention.dto';
 import { IdentityService } from '../identity/identity.service';
 import { AuthService } from '../identity/auth.service';
+import { EmailService } from '../email/email.service';
 import { OrganizationAccessStatus, Prisma } from '@prisma/client';
 import { SYSTEM_ORGANIZATION_ID, EvidenceActions } from '../../common/constants';
 import * as crypto from 'crypto';
@@ -16,12 +17,15 @@ export class PlatformOrganizationsService {
     private readonly prisma: PrismaService,
     private readonly identityService: IdentityService,
     private readonly authService: AuthService,
+    private readonly emailService: EmailService,
   ) {}
 
   async provisionOrganization(dto: ProvisionOrganizationDto, actorId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const newOrgId = crypto.randomUUID();
+    return this.prisma.executeAsTenant(newOrgId, async (tx) => {
       const org = await tx.organization.create({
         data: {
+          id: newOrgId,
           name: dto.name,
           accessStatus: OrganizationAccessStatus.PROVISIONING,
           commercialStatus: dto.commercialStatus,
@@ -50,42 +54,59 @@ export class PlatformOrganizationsService {
   async getDirectory(page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
-      this.prisma.organization.findMany({
-        where: {
-          id: { not: SYSTEM_ORGANIZATION_ID },
-        },
-        select: {
-          id: true,
-          name: true,
-          accessStatus: true,
-          commercialStatus: true,
-          createdAt: true,
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.organization.count({
-        where: {
-          id: { not: SYSTEM_ORGANIZATION_ID },
-        },
-      }),
-    ]);
+    return this.prisma.executeAsPlatformAdmin(async (tx) => {
+      const [data, total] = await Promise.all([
+        tx.organization.findMany({
+          where: {
+            id: { not: SYSTEM_ORGANIZATION_ID },
+          },
+          select: {
+            id: true,
+            name: true,
+            accessStatus: true,
+            commercialStatus: true,
+            createdAt: true,
+            members: {
+              where: { role: 'OWNER' },
+              select: {
+                identity: { select: { email: true } },
+              },
+              take: 1,
+            },
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        tx.organization.count({
+          where: {
+            id: { not: SYSTEM_ORGANIZATION_ID },
+          },
+        }),
+      ]);
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+      return {
+        data: data.map(org => ({
+          id: org.id,
+          name: org.name,
+          accessStatus: org.accessStatus,
+          commercialStatus: org.commercialStatus,
+          createdAt: org.createdAt,
+          ownerEmail: org.members[0]?.identity?.email || null,
+        })),
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    });
   }
 
   async inviteInitialOwner(organizationId: string, dto: InviteOwnerDto, actorId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    let queuedOutboxId: string | null = null;
+    await this.prisma.executeAsTenant(organizationId, async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
       });
@@ -125,21 +146,33 @@ export class PlatformOrganizationsService {
         },
       });
 
-      const payload = JSON.stringify({
-        type: 'INITIAL_OWNER_INVITATION',
-        email: dto.email,
-        token, // Plaintext token sent via email
-      });
-
-      await tx.emailOutbox.create({
-        data: {
-          organizationId,
-          payload,
-        },
-      });
-
-      return { success: true };
+      const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${token}`;
+      queuedOutboxId = await this.emailService.queueEmail(
+        tx as any,
+        organizationId,
+        dto.email,
+        'initial-owner-invitation',
+        {
+          organizationName: org.name,
+          inviterName: 'Platform Administrator',
+          inviteUrl,
+        }
+      );
     });
+
+    if (queuedOutboxId) {
+      setImmediate(async () => {
+        try {
+          await this.prisma.executeAsTenant(organizationId, async (tx) => {
+            await this.emailService.dispatchEmail(tx as any, queuedOutboxId!);
+          });
+        } catch (error) {
+          console.error('Failed to dispatch initial owner invitation email:', error);
+        }
+      });
+    }
+
+    return { success: true };
   }
 
   async disableOrganization(organizationId: string, dto: DisableOrganizationDto, actorId: string) {
@@ -148,7 +181,7 @@ export class PlatformOrganizationsService {
       throw new UnauthorizedException('Recent authentication failed.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
       });
@@ -189,7 +222,7 @@ export class PlatformOrganizationsService {
       throw new UnauthorizedException('Recent authentication failed.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
       });
@@ -226,5 +259,114 @@ export class PlatformOrganizationsService {
       return { success: true };
     });
   }
-}
 
+  async suspendOrganization(organizationId: string, dto: { reason: string; passwordConfirmation: string }, actorId: string) {
+    const isValid = await this.identityService.verifyPassword(actorId, dto.passwordConfirmation);
+    if (!isValid) {
+      throw new UnauthorizedException('Recent authentication failed.');
+    }
+
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+      });
+
+      if (!org) {
+        throw new NotFoundException('Organization not found');
+      }
+
+      if (org.accessStatus !== OrganizationAccessStatus.ACTIVE) {
+        throw new ConflictException('Only ACTIVE organizations can be suspended');
+      }
+
+      const updatedOrg = await tx.organization.update({
+        where: { id: organizationId },
+        data: { accessStatus: OrganizationAccessStatus.SUSPENDED },
+      });
+
+      await this.authService.revokeSessionsForOrganization(organizationId);
+
+      await tx.evidence.create({
+        data: {
+          organizationId: updatedOrg.id,
+          actorId,
+          action: EvidenceActions.SUSPEND_ORGANIZATION,
+          reason: dto.reason,
+          before: { accessStatus: org.accessStatus },
+          after: { accessStatus: updatedOrg.accessStatus },
+        },
+      });
+
+      return updatedOrg;
+    });
+  }
+
+  async reactivateOrganization(organizationId: string, dto: { reason: string; passwordConfirmation: string }, actorId: string) {
+    const isValid = await this.identityService.verifyPassword(actorId, dto.passwordConfirmation);
+    if (!isValid) {
+      throw new UnauthorizedException('Recent authentication failed.');
+    }
+
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+      });
+
+      if (!org) {
+        throw new NotFoundException('Organization not found');
+      }
+
+      if (org.accessStatus !== OrganizationAccessStatus.SUSPENDED) {
+        throw new ConflictException('Only SUSPENDED organizations can be reactivated');
+      }
+
+      const updatedOrg = await tx.organization.update({
+        where: { id: organizationId },
+        data: { accessStatus: OrganizationAccessStatus.ACTIVE },
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId: updatedOrg.id,
+          actorId,
+          action: EvidenceActions.REACTIVATE_ORGANIZATION,
+          reason: dto.reason,
+          before: { accessStatus: org.accessStatus },
+          after: { accessStatus: updatedOrg.accessStatus },
+        },
+      });
+
+      return updatedOrg;
+    });
+  }
+
+  async updateCommercialStatus(organizationId: string, dto: { commercialStatus: string; reason: string }, actorId: string) {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+      });
+
+      if (!org) {
+        throw new NotFoundException('Organization not found');
+      }
+
+      const updatedOrg = await tx.organization.update({
+        where: { id: organizationId },
+        data: { commercialStatus: dto.commercialStatus as any },
+      });
+
+      await tx.evidence.create({
+        data: {
+          organizationId: updatedOrg.id,
+          actorId,
+          action: EvidenceActions.UPDATE_COMMERCIAL_STATUS,
+          reason: dto.reason,
+          before: { commercialStatus: org.commercialStatus },
+          after: { commercialStatus: updatedOrg.commercialStatus },
+        },
+      });
+
+      return updatedOrg;
+    });
+  }
+}

@@ -4,5 +4,5 @@ export class ProposeTransferDto {
   @IsString()
   @IsNotEmpty()
   @IsUUID()
-  successorMemberId: string;
+  successorMemberId!: string;
 }

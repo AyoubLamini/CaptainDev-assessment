@@ -74,7 +74,7 @@ export class AuthService {
       },
     });
 
-    return { sessionId, expiresAt };
+    return { sessionId, expiresAt, isPlatformAdmin: user.isPlatformAdmin };
   }
 
   async logout(sessionId: string) {
@@ -82,6 +82,41 @@ export class AuthService {
     await this.prisma.session.deleteMany({
       where: { id: sessionIdHash },
     });
+  }
+
+  async getMe(sessionId: string) {
+    const sessionIdHash = crypto.createHash('sha256').update(sessionId).digest('hex');
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionIdHash },
+      include: {
+        identity: true,
+      }
+    });
+
+    if (!session || session.expiresAt < new Date()) {
+      return null;
+    }
+
+    // Since identity table has no RLS, this worked.
+    // However, organization_member has RLS! But wait, we want to list all organizations for this identity.
+    // This is a global system action, so we bypass RLS using executeAsPlatformAdmin,
+    // or better, since a user is just querying their own memberships, we can executeAsPlatformAdmin just for this.
+    const memberships = await this.prisma.executeAsPlatformAdmin((tx) => {
+      return tx.organizationMember.findMany({
+        where: { identityId: session.identityId },
+        include: { organization: true }
+      });
+    });
+
+    return {
+      identity: session.identity,
+      organizations: memberships.map(m => ({
+        id: m.organization.id,
+        name: m.organization.name,
+        role: m.role,
+        status: m.status,
+      }))
+    };
   }
 
   async requestPasswordReset(email: string) {
@@ -100,7 +135,7 @@ export class AuthService {
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         
         const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
+        expiresAt.setMinutes(expiresAt.getMinutes() + 30); // 30-minute expiry per assessment spec
 
         let queuedOutboxId: string | null = null;
           queuedOutboxId = await this.prisma.executeAsTenant(SYSTEM_ORGANIZATION_ID, async (tx) => {
@@ -141,12 +176,12 @@ export class AuthService {
                 await this.emailService.dispatchEmail(tx as any, queuedOutboxId!);
               });
             } catch (error) {
-              console.log("First error catch: ", error);
+              console.error("Failed to dispatch password reset email:", error);
             }
           });
         }
       } catch (error) {
-        console.log("Second error catch: ", error);
+        console.error("Failed to queue password reset email:", error);
       }
     });
 

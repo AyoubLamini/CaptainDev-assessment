@@ -27,7 +27,9 @@ export class CollaboratorInvitationService {
     // Ensure email is normalized
     const email = dto.email.toLowerCase().trim();
 
-    return this.prisma.$transaction(async (tx) => {
+    let queuedOutboxId: string | null = null;
+
+    await this.prisma.executeAsTenant(organizationId, async (tx) => {
       // Find org
       const org = await tx.organization.findUnique({
         where: { id: organizationId }
@@ -48,8 +50,7 @@ export class CollaboratorInvitationService {
           }
         });
         if (existingMember) {
-          // Neutral success response for existing member, no email sent
-          return { success: true };
+          throw new BadRequestException('User is already a member of this organization');
         }
       }
 
@@ -79,14 +80,14 @@ export class CollaboratorInvitationService {
       });
 
       // Queue email
-      const outboxId = await this.emailService.queueEmail(
-        tx,
+      queuedOutboxId = await this.emailService.queueEmail(
+        tx as any,
         organizationId,
         email,
         'collaborator-invitation',
         {
           organizationName: org.name,
-          inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invitation?token=${rawToken}`
+          inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${rawToken}&type=collaborator`
         }
       );
 
@@ -100,15 +101,30 @@ export class CollaboratorInvitationService {
           after: { email, role: dto.role, grants: dto.grants }
         }
       });
-      
-      return { success: true };
     });
+
+    // Dispatch email after transaction commits
+    if (queuedOutboxId) {
+      setImmediate(async () => {
+        try {
+          await this.prisma.executeAsTenant(organizationId, async (tx) => {
+            await this.emailService.dispatchEmail(tx as any, queuedOutboxId!);
+          });
+        } catch (error) {
+          console.error('Failed to dispatch collaborator invitation email:', error);
+        }
+      });
+    }
+
+    return { success: true };
   }
 
   async listInvitations(organizationId: string) {
-    const invitations = await this.prisma.organizationInvitation.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' }
+    const invitations = await this.prisma.executeAsTenant(organizationId, async (tx) => {
+      return tx.organizationInvitation.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: 'desc' }
+      });
     });
     
     return invitations.map(inv => ({
@@ -117,6 +133,7 @@ export class CollaboratorInvitationService {
       role: inv.role,
       state: inv.consumedAt ? 'consumed_or_revoked' : (inv.expiresAt < new Date() ? 'expired' : 'pending'),
       expiresAt: inv.expiresAt,
+      consumedAt: inv.consumedAt,
       createdAt: inv.createdAt,
       grants: inv.grants
     }));
@@ -127,7 +144,9 @@ export class CollaboratorInvitationService {
     organizationId: string,
     invitationId: string
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    let queuedOutboxId: string | null = null;
+
+    await this.prisma.executeAsTenant(organizationId, async (tx) => {
       const existing = await tx.organizationInvitation.findFirst({
         where: {
           id: invitationId,
@@ -165,14 +184,14 @@ export class CollaboratorInvitationService {
         }
       });
 
-      await this.emailService.queueEmail(
-        tx,
+      queuedOutboxId = await this.emailService.queueEmail(
+        tx as any,
         organizationId,
         existing.email,
         'collaborator-invitation',
         {
           organizationName: existing.organization.name,
-          inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invitation?token=${rawToken}`
+          inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${rawToken}&type=collaborator`
         }
       );
 
@@ -185,9 +204,22 @@ export class CollaboratorInvitationService {
           after: { email: existing.email, invitationId: newInv.id }
         }
       });
-
-      return { success: true };
     });
+
+    // Dispatch email after transaction commits
+    if (queuedOutboxId) {
+      setImmediate(async () => {
+        try {
+          await this.prisma.executeAsTenant(organizationId, async (tx) => {
+            await this.emailService.dispatchEmail(tx as any, queuedOutboxId!);
+          });
+        } catch (error) {
+          console.error('Failed to dispatch resend invitation email:', error);
+        }
+      });
+    }
+
+    return { success: true };
   }
 
   async revokeInvitation(
@@ -195,7 +227,7 @@ export class CollaboratorInvitationService {
     organizationId: string,
     invitationId: string
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const existing = await tx.organizationInvitation.findFirst({
         where: {
           id: invitationId,

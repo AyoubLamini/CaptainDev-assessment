@@ -3,13 +3,16 @@ import { PrismaService } from '../../database/prisma.service';
 import * as crypto from 'crypto';
 import { Request } from 'express';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const SESSION_COOKIE = isProduction ? '__Host-session' : 'nova_session';
+
 @Injectable()
 export class OrgAdminGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const sessionId = request.cookies?.['__Host-session'];
+    const sessionId = request.cookies?.[SESSION_COOKIE];
 
     if (!sessionId || typeof sessionId !== 'string') {
       throw new UnauthorizedException('Missing or invalid session');
@@ -33,13 +36,15 @@ export class OrgAdminGuard implements CanActivate {
       throw new BadRequestException('Organization ID is required');
     }
 
-    const membership = await this.prisma.organizationMember.findUnique({
-      where: {
-        organizationId_identityId: {
-          organizationId: organizationId,
-          identityId: session.identityId,
+    const membership = await this.prisma.executeAsPlatformAdmin(async (tx) => {
+      return tx.organizationMember.findUnique({
+        where: {
+          organizationId_identityId: {
+            organizationId: organizationId,
+            identityId: session.identityId,
+          }
         }
-      }
+      });
     });
 
     if (!membership || (membership.role !== 'ADMIN' && membership.role !== 'OWNER')) {
@@ -54,6 +59,7 @@ export class OrgAdminGuard implements CanActivate {
     (request as any).identity = session.identity;
     (request as any).session = session;
     (request as any).organizationId = organizationId;
+    (request as any).membership = membership;
 
     return true;
   }

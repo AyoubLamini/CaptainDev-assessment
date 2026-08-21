@@ -9,19 +9,38 @@ import { Prisma } from '@prisma/client';
 export class CollaboratorService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async listCollaborators(organizationId: string) {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      return tx.organizationMember.findMany({
+        where: { organizationId },
+        include: {
+          identity: {
+            select: {
+              id: true,
+              email: true,
+            }
+          }
+        },
+        orderBy: { createdAt: 'asc' }
+      });
+    });
+  }
+
   async getCollaborator(organizationId: string, memberId: string) {
-    const member = await this.prisma.organizationMember.findUnique({
-      where: {
-        id: memberId,
-      },
-      include: {
-        identity: {
-          select: {
-            id: true,
-            email: true,
+    const member = await this.prisma.executeAsTenant(organizationId, async (tx) => {
+      return tx.organizationMember.findUnique({
+        where: {
+          id: memberId,
+        },
+        include: {
+          identity: {
+            select: {
+              id: true,
+              email: true,
+            }
           }
         }
-      }
+      });
     });
 
     if (!member || member.organizationId !== organizationId) {
@@ -42,49 +61,49 @@ export class CollaboratorService {
     dto: UpdateCollaboratorGrantsDto,
     sessionCreatedAt: any
   ) {
-    const member = await this.prisma.organizationMember.findUnique({
-      where: { id: memberId },
-    });
-
-    if (!member || member.organizationId !== organizationId) {
-      throw new NotFoundException('Collaborator not found');
-    }
-
-    if (member.status !== 'ACTIVE') {
-      throw new BadRequestException('Inactive member');
-    }
-
-    if (member.identityId === adminIdentityId) {
-      throw new ForbiddenException('Administrators cannot update their own explicit grants');
-    }
-
-    // Validate scope boundaries: all provided scopes must exist in the organization and be active
-    if (dto.grants.scopes && dto.grants.scopes.length > 0) {
-      // Use Set to handle duplicate valid IDs correctly as per spec
-      const uniqueScopeIds = Array.from(new Set(dto.grants.scopes));
-      
-      const existingScopes = await this.prisma.businessScope.findMany({
-        where: {
-          id: { in: uniqueScopeIds },
-          organizationId: organizationId,
-          status: 'ACTIVE',
-        },
-        select: { id: true }
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const member = await tx.organizationMember.findUnique({
+        where: { id: memberId },
       });
 
-      if (existingScopes.length !== uniqueScopeIds.length) {
-        throw new BadRequestException('One or more scopes do not exist within this organization or are inactive');
+      if (!member || member.organizationId !== organizationId) {
+        throw new NotFoundException('Collaborator not found');
       }
-    }
 
-    const oldGrants = member.grants as Record<string, any> | null;
-    const isReduction = this.detectAccessReduction(oldGrants, dto.grants);
+      if (member.status !== 'ACTIVE') {
+        throw new BadRequestException('Inactive member');
+      }
 
-    if (isReduction) {
-      verifyRecentAuth(sessionCreatedAt, 15);
-    }
+      if (member.identityId === adminIdentityId) {
+        throw new ForbiddenException('Administrators cannot update their own explicit grants');
+      }
 
-    return this.prisma.$transaction(async (tx) => {
+      // Validate scope boundaries: all provided scopes must exist in the organization and be active
+      if (dto.grants.scopes && dto.grants.scopes.length > 0) {
+        // Use Set to handle duplicate valid IDs correctly as per spec
+        const uniqueScopeIds = Array.from(new Set(dto.grants.scopes));
+        
+        const existingScopes = await tx.businessScope.findMany({
+          where: {
+            id: { in: uniqueScopeIds },
+            organizationId: organizationId,
+            status: 'ACTIVE',
+          },
+          select: { id: true }
+        });
+
+        if (existingScopes.length !== uniqueScopeIds.length) {
+          throw new BadRequestException('One or more scopes do not exist within this organization or are inactive');
+        }
+      }
+
+      const oldGrants = member.grants as Record<string, any> | null;
+      const isReduction = this.detectAccessReduction(oldGrants, dto.grants);
+
+      if (isReduction) {
+        verifyRecentAuth(sessionCreatedAt, 15);
+      }
+
       const updatedMember = await tx.organizationMember.update({
         where: { id: memberId },
         data: {
@@ -134,31 +153,31 @@ export class CollaboratorService {
     status: import('@prisma/client').OrganizationMemberStatus,
     sessionCreatedAt: Date | undefined
   ) {
-    const member = await this.prisma.organizationMember.findUnique({
-      where: { id: memberId },
-    });
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const member = await tx.organizationMember.findUnique({
+        where: { id: memberId },
+      });
 
-    if (!member || member.organizationId !== organizationId) {
-      throw new NotFoundException('Collaborator not found');
-    }
+      if (!member || member.organizationId !== organizationId) {
+        throw new NotFoundException('Collaborator not found');
+      }
 
-    if (member.status === 'REMOVED') {
-      throw new BadRequestException('Cannot change status of a removed member');
-    }
-    
-    if (status === member.status) {
-      return member;
-    }
+      if (member.status === 'REMOVED') {
+        throw new BadRequestException('Cannot change status of a removed member');
+      }
+      
+      if (status === member.status) {
+        return member;
+      }
 
-    if (member.identityId === adminIdentityId) {
-      throw new ForbiddenException('Administrators cannot change their own status');
-    }
+      if (member.identityId === adminIdentityId) {
+        throw new ForbiddenException('Administrators cannot change their own status');
+      }
 
-    if (status === 'SUSPENDED' || status === 'REMOVED') {
-      verifyRecentAuth(sessionCreatedAt, 15);
-    }
+      if (status === 'SUSPENDED' || status === 'REMOVED') {
+        verifyRecentAuth(sessionCreatedAt, 15);
+      }
 
-    return this.prisma.$transaction(async (tx) => {
       if (status === 'SUSPENDED' || status === 'REMOVED') {
         if (member.role === 'OWNER') {
           const activeOwnersCount = await tx.organizationMember.count({
@@ -220,7 +239,7 @@ export class CollaboratorService {
   ) {
     verifyRecentAuth(sessionCreatedAt, 15);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const member = await tx.organizationMember.findUnique({
         where: { id: memberId },
       });
@@ -269,7 +288,7 @@ export class CollaboratorService {
   ) {
     verifyRecentAuth(sessionCreatedAt, 15);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const ownerMember = await tx.organizationMember.findUnique({
         where: { organizationId_identityId: { organizationId, identityId: adminIdentityId } }
       });
@@ -341,7 +360,7 @@ export class CollaboratorService {
   ) {
     verifyRecentAuth(sessionCreatedAt, 15);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const member = await tx.organizationMember.findUnique({
         where: { organizationId_identityId: { organizationId, identityId: adminIdentityId } }
       });
@@ -418,7 +437,7 @@ export class CollaboratorService {
   ) {
     verifyRecentAuth(sessionCreatedAt, 15);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
       const member = await tx.organizationMember.findUnique({
         where: { organizationId_identityId: { organizationId, identityId: adminIdentityId } }
       });

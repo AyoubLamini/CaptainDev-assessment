@@ -41,17 +41,12 @@ Create a **private GitHub repository** that you control for your implementation.
 
 At the end of the assessment, record a Loom video of no more than 10 minutes showing the platform running. Present the implemented modules and their main features, and demonstrate the principal functional journeys working end to end. In particular, show a real invitation arriving in a mailbox you control, open its link, activate the account, and show that the same invitation cannot be reused. Also show receipt and successful use of a real password-reset email. Security and failure-path properties that are not practical to demonstrate visually should be supported by automated test evidence instead. Use only synthetic identities and data. Add the Loom link to `SUBMISSION.md` and keep it accessible throughout the review process without requiring additional access.
 
-## Source precedence
+## Reading order & Source precedence
 
-If documents appear to conflict, use this order:
-
-1. `ASSESSMENT.md` for assessment scope, suggested timing, and deliverables;
-2. `docs/architecture/SECURITY-INVARIANTS.md` for security requirements;
-3. `docs/product/PRODUCT-REQUIREMENTS.md` for behavior;
-4. `docs/architecture/ARCHITECTURE.md` for the required assessment implementation structure;
-5. UX mockups for visual intent only.
-
-Ask for clarification when a conflict cannot be resolved by this order. Do not silently weaken a requirement.
+1. `ASSESSMENT.md` (The source of truth for scope and requirements)
+2. `docs/product/PRODUCT-REQUIREMENTS.md`
+3. `docs/architecture/ARCHITECTURE.md`
+4. `docs/architecture/SECURITY-INVARIANTS.md`
 
 ## Getting Started
 

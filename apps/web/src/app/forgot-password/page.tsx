@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
     setError('');
     
     try {
-      const csrfToken = getCookie('__Host-csrf');
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };

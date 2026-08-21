@@ -16,8 +16,9 @@ export class InvitationService {
     // Hash password OUTSIDE the transaction to prevent connection pool exhaustion
     const passwordHash = await argon2.hash(dto.password);
 
-    return this.prisma.$transaction(async (tx) => {
-      const invitation = await tx.organizationInvitation.findFirst({
+    // 1. Fetch invitation by bypassing RLS
+    const invitation = await this.prisma.executeAsPlatformAdmin(async (tx) => {
+      return tx.organizationInvitation.findFirst({
         where: {
           tokenHash,
           consumedAt: null,
@@ -27,15 +28,18 @@ export class InvitationService {
           organization: true,
         },
       });
+    });
 
-      if (!invitation) {
-        throw new BadRequestException('Invalid, expired, or consumed invitation token');
-      }
+    if (!invitation) {
+      throw new BadRequestException('Invalid, expired, or consumed invitation token');
+    }
 
-      if (invitation.organization.accessStatus !== OrganizationAccessStatus.PROVISIONING) {
-        throw new ConflictException('Organization is not in PROVISIONING state');
-      }
+    if (invitation.organization.accessStatus !== OrganizationAccessStatus.PROVISIONING) {
+      throw new ConflictException('Organization is not in PROVISIONING state');
+    }
 
+    // 2. Perform actions within the tenant's context
+    return this.prisma.executeAsTenant(invitation.organizationId, async (tx) => {
       const existingIdentity = await tx.identity.findUnique({
         where: { email: invitation.email },
       });
@@ -61,7 +65,8 @@ export class InvitationService {
         data: {
           organizationId: invitation.organizationId,
           identityId: identity.id,
-          role: 'ADMIN',
+          role: 'OWNER',
+          status: 'ACTIVE',
         },
       });
 
@@ -89,29 +94,31 @@ export class InvitationService {
       });
 
       return { success: true };
-    }, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
   }
 
   async acceptCollaboratorInvitation(dto: AcceptInvitationDto) {
     const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
 
-    const invitation = await this.prisma.organizationInvitation.findFirst({
-      where: {
-        tokenHash,
-        consumedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      include: {
-        organization: true,
-      },
+    // 1. Fetch invitation bypassing RLS
+    const invitation = await this.prisma.executeAsPlatformAdmin(async (tx) => {
+      return tx.organizationInvitation.findFirst({
+        where: {
+          tokenHash,
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        include: {
+          organization: true,
+        },
+      });
     });
 
     if (!invitation) {
       throw new BadRequestException('Invalid or expired invitation token');
     }
 
+    // `identity` table doesn't have RLS, so this works globally
     let identity = await this.prisma.identity.findUnique({
       where: { email: invitation.email },
       include: { passwordCredential: true }
@@ -139,7 +146,8 @@ export class InvitationService {
       newPasswordHash = await argon2.hash(dto.password);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    // 2. Perform actions inside the tenant context
+    return this.prisma.executeAsTenant(invitation.organizationId, async (tx) => {
       // Check again inside tx
       const txInvitation = await tx.organizationInvitation.findFirst({
         where: {
@@ -185,7 +193,7 @@ export class InvitationService {
           data: {
             organizationId: invitation.organizationId,
             identityId: identity.id,
-            role: invitation.role || 'COLLABORATOR',
+            role: invitation.role || 'USER',
             grants: invitation.grants || Prisma.JsonNull,
           },
         });
@@ -209,8 +217,6 @@ export class InvitationService {
       });
 
       return { success: true };
-    }, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
   }
 }

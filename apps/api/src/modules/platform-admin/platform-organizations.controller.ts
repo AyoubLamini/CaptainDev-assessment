@@ -1,8 +1,11 @@
-import { Controller, Post, Get, Body, UseGuards, Query, DefaultValuePipe, ParseIntPipe, Req, UsePipes, ValidationPipe, Param } from '@nestjs/common';
+import { Controller, Post, Patch, Get, Body, UseGuards, Query, DefaultValuePipe, ParseIntPipe, Req, UsePipes, ValidationPipe, Param } from '@nestjs/common';
 import { PlatformOrganizationsService } from './platform-organizations.service';
 import { ProvisionOrganizationDto } from './dto/provision-organization.dto';
 import { InviteOwnerDto } from './dto/invite-owner.dto';
 import { DisableOrganizationDto } from './dto/disable-organization.dto';
+import { SuspendOrganizationDto } from './dto/suspend-organization.dto';
+import { ReactivateOrganizationDto } from './dto/reactivate-organization.dto';
+import { UpdateCommercialStatusDto } from './dto/update-commercial-status.dto';
 import { PlatformInterventionDto } from './dto/platform-intervention.dto';
 import { PlatformAdminGuard } from '../access-control/guards/platform-admin.guard';
 import { Request } from 'express';
@@ -39,6 +42,26 @@ export class PlatformOrganizationsController {
     return this.service.inviteInitialOwner(id, dto, actorId);
   }
 
+  @Post(':id/suspend')
+  async suspendOrganization(
+    @Param('id') id: string,
+    @Body() dto: SuspendOrganizationDto,
+    @Req() req: Request,
+  ) {
+    const actorId = req.identity?.id as string;
+    return this.service.suspendOrganization(id, dto, actorId);
+  }
+
+  @Post(':id/reactivate')
+  async reactivateOrganization(
+    @Param('id') id: string,
+    @Body() dto: ReactivateOrganizationDto,
+    @Req() req: Request,
+  ) {
+    const actorId = req.identity?.id as string;
+    return this.service.reactivateOrganization(id, dto, actorId);
+  }
+
   @Post(':id/disable')
   async disableOrganization(
     @Param('id') id: string,
@@ -47,6 +70,16 @@ export class PlatformOrganizationsController {
   ) {
     const actorId = req.identity?.id as string;
     return this.service.disableOrganization(id, dto, actorId);
+  }
+
+  @Patch(':id/commercial-status')
+  async updateCommercialStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateCommercialStatusDto,
+    @Req() req: Request,
+  ) {
+    const actorId = req.identity?.id as string;
+    return this.service.updateCommercialStatus(id, dto, actorId);
   }
 
   @Post(':id/intervention')
@@ -59,3 +92,4 @@ export class PlatformOrganizationsController {
     return this.service.performIntervention(id, dto, actorId);
   }
 }
+

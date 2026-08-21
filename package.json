@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "pnpm -r tsc --noEmit",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build"
   },
   "devDependencies": {
     "prettier": "^3.4.2",

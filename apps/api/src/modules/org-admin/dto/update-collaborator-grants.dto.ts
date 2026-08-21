@@ -23,13 +23,13 @@ export class GrantsPayloadDto {
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   @Validate(NoPlatformCapabilitiesConstraint)
-  capabilities: string[];
+  capabilities!: string[];
 
   @IsArray()
   @ArrayUnique()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
-  scopes: string[];
+  scopes!: string[];
 }
 
 export class UpdateCollaboratorGrantsDto {
@@ -37,5 +37,5 @@ export class UpdateCollaboratorGrantsDto {
   @IsObject()
   @ValidateNested()
   @Type(() => GrantsPayloadDto)
-  grants: GrantsPayloadDto;
+  grants!: GrantsPayloadDto;
 }

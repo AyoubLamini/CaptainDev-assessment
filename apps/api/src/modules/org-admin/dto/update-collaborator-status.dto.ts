@@ -3,5 +3,5 @@ import { OrganizationMemberStatus } from '@prisma/client';
 
 export class UpdateCollaboratorStatusDto {
   @IsEnum(OrganizationMemberStatus)
-  status: OrganizationMemberStatus;
+  status!: OrganizationMemberStatus;
 }

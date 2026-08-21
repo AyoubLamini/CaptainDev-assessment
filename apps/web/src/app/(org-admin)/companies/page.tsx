@@ -7,17 +7,32 @@ type Company = {
   id: string;
   name: string;
   status: string;
+  scopes?: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+  }[];
 };
+
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return undefined;
+}
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [organizationId, setOrganizationId] = useState('00000000-0000-0000-0000-000000000000');
+  const [organizationId, setOrganizationId] = useState('');
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch(`/api/org-admin/${organizationId}/companies`, {
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies`, {
+        credentials: 'include',
         headers: {
           'x-organization-id': organizationId
         }
@@ -32,6 +47,24 @@ export default function CompaniesPage() {
   };
 
   useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.organizations && data.organizations.length > 0) {
+            setOrganizations(data.organizations);
+            setOrganizationId(data.organizations[0].id);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch user', e);
+      }
+    };
+    fetchMe();
+  }, []);
+
+  useEffect(() => {
     if (organizationId) {
       fetchCompanies();
     }
@@ -40,12 +73,17 @@ export default function CompaniesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`/api/org-admin/${organizationId}/companies`, {
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const headers: HeadersInit = { 
+        'Content-Type': 'application/json',
+        'x-organization-id': organizationId
+      };
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-organization-id': organizationId
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ name }),
       });
       if (res.ok) {
@@ -64,12 +102,17 @@ export default function CompaniesPage() {
     e.preventDefault();
     if (!editingCompany) return;
     try {
-      const res = await fetch(`/api/org-admin/${organizationId}/companies/${editingCompany.id}`, {
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const headers: HeadersInit = { 
+        'Content-Type': 'application/json',
+        'x-organization-id': organizationId
+      };
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${editingCompany.id}`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-organization-id': organizationId
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ name: editingCompany.name }),
       });
       if (res.ok) {
@@ -86,11 +129,16 @@ export default function CompaniesPage() {
 
   const handleDeactivate = async (id: string) => {
     try {
-      const res = await fetch(`/api/org-admin/${organizationId}/companies/${id}/deactivate`, {
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const headers: HeadersInit = {
+        'x-organization-id': organizationId
+      };
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${id}/deactivate`, {
         method: 'PATCH',
-        headers: {
-          'x-organization-id': organizationId
-        }
+        credentials: 'include',
+        headers
       });
       if (res.ok) {
         fetchCompanies();
@@ -103,19 +151,60 @@ export default function CompaniesPage() {
     }
   };
 
+  const handleReactivate = async (company: Company) => {
+    try {
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'x-organization-id': organizationId
+      };
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${company.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ name: company.name, status: 'ACTIVE' }),
+      });
+      if (res.ok) {
+        fetchCompanies();
+      } else {
+        const err = await res.json();
+        alert(`Failed to reactivate: ${err.message}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Manage Companies</h1>
       
       <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Organization ID (Context):
+          Organization (Context):
         </label>
-        <input 
-          value={organizationId} 
-          onChange={e => setOrganizationId(e.target.value)} 
-          className="w-full sm:max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        />
+        {organizations.length > 0 ? (
+          <select
+            value={organizationId}
+            onChange={(e) => setOrganizationId(e.target.value)}
+            className="w-full sm:max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+          >
+            {organizations.map(org => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input 
+            value={organizationId} 
+            onChange={e => setOrganizationId(e.target.value)} 
+            placeholder="Loading organizations or none found..."
+            className="w-full sm:max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        )}
       </div>
 
       <div className="mb-8">
@@ -181,21 +270,42 @@ export default function CompaniesPage() {
                   <span className={`text-xs px-2 py-1 mt-1 rounded-full w-max ${c.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                     {c.status}
                   </span>
+                  {c.scopes && c.scopes.length > 0 && (
+                    <div className="mt-3 text-sm text-gray-500">
+                      <strong className="text-gray-700">Business Scopes:</strong>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        {c.scopes.map(s => (
+                          <li key={s.id}>
+                            <span className="font-medium text-gray-800">{s.name}</span> <span className="text-xs text-gray-400">({s.type})</span> - 
+                            <span className={`ml-1 text-xs ${s.status === 'ACTIVE' ? 'text-green-600' : 'text-gray-500'}`}>{s.status}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 mt-4 sm:mt-0">
                   <button 
                     onClick={() => setEditingCompany(c)}
                     className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Edit
                   </button>
-                  <button 
-                    onClick={() => handleDeactivate(c.id)}
-                    disabled={c.status === 'INACTIVE'}
-                    className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Deactivate
-                  </button>
+                  {c.status === 'ACTIVE' ? (
+                    <button 
+                      onClick={() => handleDeactivate(c.id)}
+                      className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      Deactivate
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleReactivate(c)}
+                      className="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      Reactivate
+                    </button>
+                  )}
                   <Link 
                     href={`/companies/${c.id}/scopes/new?orgId=${organizationId}`}
                     className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"

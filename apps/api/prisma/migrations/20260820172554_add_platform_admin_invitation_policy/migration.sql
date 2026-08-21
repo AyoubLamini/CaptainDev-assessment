@@ -1,0 +1,1 @@
+CREATE POLICY platform_admin_select ON "organization_invitation" FOR SELECT USING (current_setting('app.is_platform_admin', true) = 'true');

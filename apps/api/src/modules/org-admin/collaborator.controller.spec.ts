@@ -10,6 +10,8 @@ describe('CollaboratorController', () => {
   const mockCollaboratorService = {
     getCollaborator: vi.fn(),
     updateCollaboratorGrants: vi.fn(),
+    promoteCollaborator: vi.fn(),
+    updateCollaboratorStatus: vi.fn(),
   };
 
   beforeEach(async () => {

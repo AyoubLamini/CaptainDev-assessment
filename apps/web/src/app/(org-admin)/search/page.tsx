@@ -26,16 +26,29 @@ type SearchResults = {
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const organizationId = searchParams.get('orgId') || '00000000-0000-0000-0000-000000000000';
-  
+  const [organizationId, setOrganizationId] = useState(searchParams.get('orgId') || '');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!organizationId) {
+      fetch('http://localhost:3001/auth/me', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.organizations && data.organizations.length > 0) {
+            setOrganizationId(data.organizations[0].id);
+          }
+        })
+        .catch(err => console.error('Failed to fetch user', err));
+    }
+  }, [organizationId]);
+
   const performSearch = async (q: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/org-admin/${organizationId}/search?q=${encodeURIComponent(q)}`, {
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/search?q=${encodeURIComponent(q)}`, {
+        credentials: 'include',
         headers: {
           'x-organization-id': organizationId
         }

@@ -3,13 +3,16 @@ import { PrismaService } from '../../database/prisma.service';
 import * as crypto from 'crypto';
 import { Request } from 'express';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const SESSION_COOKIE = isProduction ? '__Host-session' : 'nova_session';
+
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const sessionId = request.cookies?.['__Host-session'];
+    const sessionId = request.cookies?.[SESSION_COOKIE];
 
     if (!sessionId || typeof sessionId !== 'string') {
       throw new UnauthorizedException('Missing or invalid session');

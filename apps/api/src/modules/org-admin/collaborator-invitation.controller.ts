@@ -1,7 +1,13 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Request, HttpCode, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Req, HttpCode, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
 import { CollaboratorInvitationService } from './collaborator-invitation.service';
 import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
 import { InviteCollaboratorDto } from './dto/invite-collaborator.dto';
+import { Request } from 'express';
+
+interface AuthenticatedRequest extends Request {
+  identity: { id: string; email: string; createdAt: Date; isPlatformAdmin: boolean; [key: string]: any };
+  session?: { createdAt: any; [key: string]: any };
+}
 
 @Controller('org-admin/:organizationId/collaborators/invitations')
 @UseGuards(OrgAdminGuard)
@@ -10,11 +16,11 @@ export class CollaboratorInvitationController {
 
   @Post()
   async inviteCollaborator(
-    @Request() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: InviteCollaboratorDto
   ): Promise<{ success: boolean }> {
-    return this.invitationService.inviteCollaborator(req.user.identityId, organizationId, dto);
+    return this.invitationService.inviteCollaborator(req.identity.id, organizationId, dto);
   }
 
   @Get()
@@ -27,20 +33,20 @@ export class CollaboratorInvitationController {
   @Post(':invitationId/resend')
   @HttpCode(HttpStatus.OK)
   async resendInvitation(
-    @Request() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('invitationId', ParseUUIDPipe) invitationId: string
   ): Promise<{ success: boolean }> {
-    return this.invitationService.resendInvitation(req.user.identityId, organizationId, invitationId);
+    return this.invitationService.resendInvitation(req.identity.id, organizationId, invitationId);
   }
 
   @Post(':invitationId/revoke')
   @HttpCode(HttpStatus.OK)
   async revokeInvitation(
-    @Request() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('invitationId', ParseUUIDPipe) invitationId: string
   ): Promise<{ success: boolean }> {
-    return this.invitationService.revokeInvitation(req.user.identityId, organizationId, invitationId);
+    return this.invitationService.revokeInvitation(req.identity.id, organizationId, invitationId);
   }
 }

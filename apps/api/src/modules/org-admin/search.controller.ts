@@ -1,5 +1,6 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { SearchService } from './search.service';
+import { Request } from 'express';
 import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
 
 @Controller('org-admin/:organizationId/search')
@@ -10,6 +11,7 @@ export class SearchController {
   @Get()
   async search(
     @Param('organizationId') organizationId: string,
+    @Req() req: Request,
     @Query('q') q?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string
@@ -21,6 +23,8 @@ export class SearchController {
     const finalSkip = isNaN(skipVal) ? 0 : skipVal;
     const finalTake = isNaN(takeVal) ? 20 : takeVal;
 
-    return this.searchService.search(organizationId, q || '', finalSkip, finalTake);
+    const membership = (req as any).membership;
+
+    return this.searchService.search(organizationId, membership, q || '', finalSkip, finalTake);
   }
 }

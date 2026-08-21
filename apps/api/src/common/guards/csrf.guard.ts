@@ -1,6 +1,9 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Request } from 'express';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const CSRF_COOKIE = isProduction ? '__Host-csrf' : 'nova_csrf';
+
 @Injectable()
 export class CsrfGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -12,7 +15,7 @@ export class CsrfGuard implements CanActivate {
       return true;
     }
 
-    const csrfCookie = req.cookies['__Host-csrf'];
+    const csrfCookie = req.cookies[CSRF_COOKIE];
     const csrfHeader = req.headers['x-csrf-token'];
 
     if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {

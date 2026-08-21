@@ -21,10 +21,10 @@ describe('UpdateCollaboratorGrantsDto', () => {
 
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].property).toBe('grants');
+    expect(errors[0]?.property).toBe('grants');
     
     // Check if the constraint message is present
-    const childError = errors[0].children?.[0];
+    const childError = errors[0]?.children?.[0];
     expect(childError?.constraints?.noPlatformCapabilities).toBeDefined();
   });
 

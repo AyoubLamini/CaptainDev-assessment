@@ -5,11 +5,11 @@ import { Request } from 'express';
 import { ProposeTransferDto } from './dto/propose-transfer.dto';
 
 interface AuthenticatedRequest extends Request {
-  identity: { id: string; [key: string]: any };
+  identity: { id: string; email: string; createdAt: Date; isPlatformAdmin: boolean; [key: string]: any };
   session?: { createdAt: any; [key: string]: any };
 }
 
-@Controller('organizations/:organizationId/ownership-transfer')
+@Controller('org-admin/:organizationId/ownership-transfer')
 @UseGuards(OrgAdminGuard)
 export class OwnershipTransferController {
   constructor(private readonly collaboratorService: CollaboratorService) {}

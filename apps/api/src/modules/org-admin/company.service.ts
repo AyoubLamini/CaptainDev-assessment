@@ -9,70 +9,79 @@ export class CompanyService {
 
   async createCompany(organizationId: string, name: string, id?: string) {
     const companyId = id || randomUUID();
-    return this.prisma.company.create({
-      data: {
-        id: companyId,
-        organizationId,
-        name,
-        status: CompanyStatus.ACTIVE,
-      },
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      return tx.company.create({
+        data: {
+          id: companyId,
+          organizationId,
+          name,
+          status: CompanyStatus.ACTIVE,
+        },
+      });
     });
   }
 
   async updateCompany(organizationId: string, id: string, name: string, status?: CompanyStatus) {
-    const company = await this.prisma.company.findUnique({
-      where: {
-        organizationId_id: { organizationId, id },
-      },
-    });
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const company = await tx.company.findUnique({
+        where: {
+          organizationId_id: { organizationId, id },
+        },
+      });
 
-    if (!company) {
-      throw new NotFoundException('Company not found');
-    }
+      if (!company) {
+        throw new NotFoundException('Company not found');
+      }
 
-    return this.prisma.company.update({
-      where: {
-        organizationId_id: { organizationId, id },
-      },
-      data: {
-        name,
-        ...(status && { status }),
-      },
+      return tx.company.update({
+        where: {
+          organizationId_id: { organizationId, id },
+        },
+        data: {
+          name,
+          ...(status && { status }),
+        },
+      });
     });
   }
 
   async deactivateCompany(organizationId: string, id: string) {
-    const company = await this.prisma.company.findUnique({
-      where: {
-        organizationId_id: { organizationId, id },
-      },
-      include: {
-        scopes: true,
-      },
-    });
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const company = await tx.company.findUnique({
+        where: {
+          organizationId_id: { organizationId, id },
+        },
+        include: {
+          scopes: true,
+        },
+      });
 
-    if (!company) {
-      throw new NotFoundException('Company not found');
-    }
+      if (!company) {
+        throw new NotFoundException('Company not found');
+      }
 
-    const hasActiveScopes = company.scopes.some(scope => scope.status === BusinessScopeStatus.ACTIVE);
-    if (hasActiveScopes) {
-      throw new ConflictException('Cannot deactivate company with active business scopes');
-    }
+      const hasActiveScopes = company.scopes.some(scope => scope.status === BusinessScopeStatus.ACTIVE);
+      if (hasActiveScopes) {
+        throw new ConflictException('Cannot deactivate company with active business scopes');
+      }
 
-    return this.prisma.company.update({
-      where: {
-        organizationId_id: { organizationId, id },
-      },
-      data: {
-        status: CompanyStatus.INACTIVE,
-      },
+      return tx.company.update({
+        where: {
+          organizationId_id: { organizationId, id },
+        },
+        data: {
+          status: CompanyStatus.INACTIVE,
+        },
+      });
     });
   }
 
   async getCompanies(organizationId: string) {
-    return this.prisma.company.findMany({
-      where: { organizationId },
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      return tx.company.findMany({
+        where: { organizationId },
+        include: { scopes: true }
+      });
     });
   }
 }

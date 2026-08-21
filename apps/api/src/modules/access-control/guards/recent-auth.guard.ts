@@ -3,6 +3,9 @@ import { Request } from 'express';
 import { PrismaService } from '../../database/prisma.service';
 import * as crypto from 'crypto';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const SESSION_COOKIE = isProduction ? '__Host-session' : 'nova_session';
+
 export function verifyRecentAuth(sessionCreatedAt: any, maxAgeMinutes = 15): void {
   if (!sessionCreatedAt) {
     throw new ForbiddenException({ message: 'Recent authentication required', code: 'RECENT_AUTH_REQUIRED' });
@@ -34,7 +37,7 @@ export class RecentAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const sessionId = request.cookies?.['__Host-session'];
+    const sessionId = request.cookies?.[SESSION_COOKIE];
 
     if (!sessionId || typeof sessionId !== 'string') {
       throw new UnauthorizedException('Missing or invalid session');

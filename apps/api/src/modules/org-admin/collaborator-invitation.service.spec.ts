@@ -52,7 +52,7 @@ describe('CollaboratorInvitationService', () => {
       ]);
       const res = await service.listInvitations('org1');
       expect(res).toHaveLength(1);
-      expect(res[0].state).toBe('pending');
+      expect(res[0]?.state).toBe('pending');
     });
   });
 

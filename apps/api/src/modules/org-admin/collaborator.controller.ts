@@ -5,16 +5,22 @@ import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
-  identity: { id: string; [key: string]: any };
+  identity: { id: string; email: string; createdAt: Date; isPlatformAdmin: boolean; [key: string]: any };
   session?: { createdAt: any; [key: string]: any };
 }
 
 import { UpdateCollaboratorStatusDto } from './dto/update-collaborator-status.dto';
 
-@Controller('organizations/:organizationId/collaborators')
+@Controller('org-admin/:organizationId/collaborators')
 @UseGuards(OrgAdminGuard)
 export class CollaboratorController {
   constructor(private readonly collaboratorService: CollaboratorService) {}
+
+  @Get()
+  async listCollaborators(@Param('organizationId') organizationId: string) {
+    const collaborators = await this.collaboratorService.listCollaborators(organizationId);
+    return { data: collaborators };
+  }
 
   @Get(':id')
   async getCollaborator(

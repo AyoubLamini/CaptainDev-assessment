@@ -28,12 +28,24 @@ export default function NewScopePage({ params }: PageProps) {
     setError('');
 
     try {
-      const res = await fetch(`/api/org-admin/${organizationId}/companies/${companyId}/scopes`, {
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift();
+        return undefined;
+      };
+
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'x-organization-id': organizationId
+      };
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${companyId}/scopes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-organization-id': organizationId
-        },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({
           type,
           name,
