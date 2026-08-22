@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { Request } from 'express';
-import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
+import { OrgMemberGuard } from '../access-control/guards/org-member.guard';
 
 @Controller('org-admin/:organizationId/search')
-@UseGuards(OrgAdminGuard)
+@UseGuards(OrgMemberGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 

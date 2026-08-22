@@ -7,7 +7,21 @@ const config: Config = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        nova: {
+          base: '#060b18',
+          surface: '#0c1225',
+          elevated: '#111a33',
+          card: '#0f172a',
+          hover: '#162040',
+          border: '#1e2d4a',
+          'border-light': '#293a5c',
+          accent: '#0ea5e9',
+          'accent-hover': '#38bdf8',
+        },
+      },
+    },
   },
   plugins: [],
 };

@@ -56,13 +56,13 @@ describe('PlatformOrganizationsController & Guard', () => {
     });
 
     it('should throw UnauthorizedException if session is invalid', async () => {
-      const ctx = createMockContext({ '__Host-session': 'invalid' });
+      const ctx = createMockContext({ '__Host-session': 'invalid', 'nova_session': 'invalid' });
       prisma.session.findUnique.mockResolvedValue(null);
       await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw ForbiddenException if user is not platform admin', async () => {
-      const ctx = createMockContext({ '__Host-session': 'valid' });
+      const ctx = createMockContext({ '__Host-session': 'valid', 'nova_session': 'valid' });
       prisma.session.findUnique.mockResolvedValue({
         expiresAt: new Date(Date.now() + 10000),
         identity: { isPlatformAdmin: false },
@@ -71,7 +71,7 @@ describe('PlatformOrganizationsController & Guard', () => {
     });
 
     it('should return true and attach identity if admin', async () => {
-      const ctx = createMockContext({ '__Host-session': 'valid' });
+      const ctx = createMockContext({ '__Host-session': 'valid', 'nova_session': 'valid' });
       const identity = { isPlatformAdmin: true, id: 'admin-1' };
       prisma.session.findUnique.mockResolvedValue({
         expiresAt: new Date(Date.now() + 10000),

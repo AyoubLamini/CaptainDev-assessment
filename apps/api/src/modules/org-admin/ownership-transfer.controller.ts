@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { CollaboratorService } from './collaborator.service';
 import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
 import { Request } from 'express';
@@ -13,6 +13,14 @@ interface AuthenticatedRequest extends Request {
 @UseGuards(OrgAdminGuard)
 export class OwnershipTransferController {
   constructor(private readonly collaboratorService: CollaboratorService) {}
+
+  @Get()
+  async getActiveProposal(
+    @Param('organizationId') organizationId: string
+  ) {
+    const proposal = await this.collaboratorService.getActiveOwnershipTransferProposal(organizationId);
+    return { data: proposal };
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -70,4 +78,3 @@ export class OwnershipTransferController {
     return { data: result };
   }
 }
-

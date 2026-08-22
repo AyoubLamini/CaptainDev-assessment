@@ -9,6 +9,8 @@ describe('OrgAdminGuard', () => {
 
   beforeEach(async () => {
     mockPrismaService = {
+      executeAsPlatformAdmin: vi.fn(async (cb) => cb(mockPrismaService)),
+      executeAsTenant: vi.fn(async (orgId, cb) => cb(mockPrismaService)),
       session: { findUnique: vi.fn() },
       organizationMember: { findUnique: vi.fn() },
     };
@@ -38,37 +40,51 @@ describe('OrgAdminGuard', () => {
 
   it('should throw Unauthorized if session is invalid', async () => {
     mockPrismaService.session.findUnique.mockResolvedValue(null);
-    const ctx = createMockContext({ cookies: { '__Host-session': 'invalid' } });
+    const ctx = createMockContext({ cookies: { '__Host-session': 'invalid', 'nova_session': 'invalid' } });
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
   });
 
   it('should throw BadRequest if organizationId is missing', async () => {
     mockPrismaService.session.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() + 10000), identityId: 'id_1', identity: {} });
-    const ctx = createMockContext({ cookies: { '__Host-session': 'valid' }, headers: {}, params: {} });
+    const ctx = createMockContext({ cookies: { '__Host-session': 'valid', 'nova_session': 'valid' }, headers: {}, params: {} });
     await expect(guard.canActivate(ctx)).rejects.toThrow(BadRequestException);
   });
 
   it('should throw Forbidden if membership not found or not admin/owner', async () => {
     mockPrismaService.session.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() + 10000), identityId: 'id_1', identity: {} });
     mockPrismaService.organizationMember.findUnique.mockResolvedValue(null);
-    const ctx = createMockContext({ cookies: { '__Host-session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } });
+    const ctx = createMockContext({ cookies: { '__Host-session': 'valid', 'nova_session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } });
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
 
-    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'MEMBER', status: 'ACTIVE' });
+    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'MEMBER', status: 'ACTIVE', organization: { accessStatus: 'ACTIVE' } });
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
   it('should throw Forbidden if member is suspended', async () => {
     mockPrismaService.session.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() + 10000), identityId: 'id_1', identity: {} });
-    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'SUSPENDED' });
-    const ctx = createMockContext({ cookies: { '__Host-session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } });
+    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'SUSPENDED', organization: { accessStatus: 'ACTIVE' } });
+    const ctx = createMockContext({ cookies: { '__Host-session': 'valid', 'nova_session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } });
+    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('should throw Forbidden if organization is suspended', async () => {
+    mockPrismaService.session.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() + 10000), identityId: 'id_1', identity: {} });
+    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE', organization: { accessStatus: 'SUSPENDED' } });
+    const ctx = createMockContext({ cookies: { '__Host-session': 'valid', 'nova_session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } });
+    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('should throw Forbidden if organization is disabled', async () => {
+    mockPrismaService.session.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() + 10000), identityId: 'id_1', identity: {} });
+    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE', organization: { accessStatus: 'DISABLED' } });
+    const ctx = createMockContext({ cookies: { '__Host-session': 'valid', 'nova_session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } });
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
   it('should return true if member is active admin/owner', async () => {
-    const mockReq = { cookies: { '__Host-session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } };
+    const mockReq = { cookies: { '__Host-session': 'valid', 'nova_session': 'valid' }, headers: {}, params: { organizationId: 'org_1' } };
     mockPrismaService.session.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() + 10000), identityId: 'id_1', identity: {} });
-    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE' });
+    mockPrismaService.organizationMember.findUnique.mockResolvedValue({ role: 'ADMIN', status: 'ACTIVE', organization: { accessStatus: 'ACTIVE' } });
     const ctx = createMockContext(mockReq);
     
     const result = await guard.canActivate(ctx);

@@ -9,6 +9,8 @@ describe('CollaboratorService', () => {
   let prisma: PrismaService;
 
   const mockPrismaService = {
+    executeAsPlatformAdmin: vi.fn(async (cb) => cb(mockPrismaService)),
+    executeAsTenant: vi.fn(async (orgId, cb) => cb(mockPrismaService)),
     organizationMember: {
       findUnique: vi.fn(),
       update: vi.fn(),

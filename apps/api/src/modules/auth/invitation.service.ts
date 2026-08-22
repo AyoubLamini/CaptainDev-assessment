@@ -22,6 +22,7 @@ export class InvitationService {
         where: {
           tokenHash,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() },
         },
         include: {
@@ -106,6 +107,7 @@ export class InvitationService {
         where: {
           tokenHash,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() },
         },
         include: {
@@ -153,6 +155,7 @@ export class InvitationService {
         where: {
           tokenHash,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() },
         },
       });

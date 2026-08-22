@@ -42,7 +42,7 @@ export function ScopeCreationWizard({ companyId, organizationId }: { companyId: 
       if (!res.ok) {
         const data = await res.json();
         if (res.status === 409) {
-          setError(data); // Expecting { message, scope }
+          setError(data);
         } else {
           setError({ message: data.message || 'An error occurred' });
         }
@@ -57,85 +57,140 @@ export function ScopeCreationWizard({ companyId, organizationId }: { companyId: 
     }
   };
 
+  const steps = [
+    { num: 1, label: 'Details' },
+    { num: 2, label: 'Additional' },
+    { num: 3, label: 'Review' },
+  ];
+
   return (
-    <div className="wizard-container p-6 max-w-2xl mx-auto border rounded">
-      <h2 className="text-2xl font-bold mb-4">Create Business Scope (Step {step} of 3)</h2>
-      
+    <div style={{ maxWidth: 640, margin: '0 auto' }}>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--nova-text-primary)', marginBottom: 24 }}>
+        Create Business Scope
+      </h2>
+
+      {/* Stepper */}
+      <div className="nova-stepper" style={{ marginBottom: 28 }}>
+        {steps.map((s, i) => (
+          <React.Fragment key={s.num}>
+            <div className={`nova-step ${step === s.num ? 'nova-step-active' : step > s.num ? 'nova-step-done' : ''}`}>
+              <div className="nova-step-circle">{step > s.num ? '✓' : s.num}</div>
+              <span className="nova-step-label">{s.label}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`nova-step-connector ${step > s.num ? 'nova-step-connector-done' : ''}`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error.message}</span>
+        <div className="nova-alert nova-alert-error" style={{ marginBottom: 20 }}>
+          <span><strong>Error: </strong>{error.message}</span>
           {error.scope && (
-            <div className="mt-2 text-sm">
-              <p>Conflicting Scope ID: {error.scope.id}</p>
-              <p>Name: {error.scope.name}</p>
+            <div style={{ marginTop: 8, fontSize: '0.8125rem' }}>
+              <p style={{ margin: '2px 0' }}>Conflicting Scope ID: {error.scope.id}</p>
+              <p style={{ margin: '2px 0' }}>Name: {error.scope.name}</p>
             </div>
           )}
         </div>
       )}
 
-      {step === 1 && (
-        <div className="step-1">
-          <h3 className="text-lg mb-2">Scope Details</h3>
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-2">Type</label>
-            <select name="type" value={formData.type} onChange={handleChange} className="border p-2 w-full">
-              <option value="RESTAURANT">Restaurant</option>
-              <option value="PROPERTY_DEVELOPMENT">Property Development</option>
-              <option value="CONSTRUCTION">Construction</option>
-              <option value="EVENT">Event</option>
-            </select>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-2">Name</label>
-            <input type="text" name="name" value={formData.name} onChange={handleChange} className="border p-2 w-full" required />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-2">External Identifier (Optional)</label>
-            <input type="text" name="externalId" value={formData.externalId} onChange={handleChange} className="border p-2 w-full" />
-          </div>
-          <button onClick={handleNext} disabled={!formData.name.trim()} className="bg-blue-500 text-white px-4 py-2 rounded">Next</button>
-        </div>
-      )}
+      <div className="nova-card">
+        <div className="nova-card-body">
+          {step === 1 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div>
+                <label className="nova-label">Type</label>
+                <select name="type" value={formData.type} onChange={handleChange} className="nova-select">
+                  <option value="RESTAURANT">Restaurant</option>
+                  <option value="PROPERTY_DEVELOPMENT">Property Development</option>
+                  <option value="CONSTRUCTION">Construction</option>
+                  <option value="EVENT">Event</option>
+                </select>
+              </div>
+              <div>
+                <label className="nova-label">Name *</label>
+                <input type="text" name="name" value={formData.name} onChange={handleChange} className="nova-input" required />
+              </div>
+              <div>
+                <label className="nova-label">External Identifier (Optional)</label>
+                <input type="text" name="externalId" value={formData.externalId} onChange={handleChange} className="nova-input" />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={handleNext} disabled={!formData.name.trim()} className="nova-btn nova-btn-primary">
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
 
-      {step === 2 && (
-        <div className="step-2">
-          <h3 className="text-lg mb-2">Additional Information</h3>
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-2">Location (Optional)</label>
-            <input type="text" name="location" value={formData.location} onChange={handleChange} className="border p-2 w-full" />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-bold mb-2">Responsible Person (Optional)</label>
-            <input type="text" name="responsiblePerson" value={formData.responsiblePerson} onChange={handleChange} className="border p-2 w-full" />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleBack} className="bg-gray-300 px-4 py-2 rounded">Back</button>
-            <button onClick={handleNext} className="bg-blue-500 text-white px-4 py-2 rounded">Next</button>
-          </div>
-        </div>
-      )}
+          {step === 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div>
+                <label className="nova-label">Location (Optional)</label>
+                <input type="text" name="location" value={formData.location} onChange={handleChange} className="nova-input" />
+              </div>
+              <div>
+                <label className="nova-label">Responsible Person (Optional)</label>
+                <input type="text" name="responsiblePerson" value={formData.responsiblePerson} onChange={handleChange} className="nova-input" />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button onClick={handleBack} className="nova-btn nova-btn-ghost">← Back</button>
+                <button onClick={handleNext} className="nova-btn nova-btn-primary">Next →</button>
+              </div>
+            </div>
+          )}
 
-      {step === 3 && (
-        <div className="step-3">
-          <h3 className="text-lg mb-2">Review & Confirm</h3>
-          <div className="bg-gray-50 p-4 rounded mb-4">
-            <p><strong>Organization ID:</strong> {organizationId}</p>
-            <p><strong>Company ID:</strong> {companyId}</p>
-            <p><strong>Type:</strong> {formData.type}</p>
-            <p><strong>Name:</strong> {formData.name}</p>
-            <p><strong>External ID:</strong> {formData.externalId || '(None)'}</p>
-            <p><strong>Location:</strong> {formData.location || '(None)'}</p>
-            <p><strong>Responsible Person:</strong> {formData.responsiblePerson || '(None)'}</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleBack} disabled={isSubmitting} className="bg-gray-300 px-4 py-2 rounded">Back</button>
-            <button onClick={handleSubmit} disabled={isSubmitting} className="bg-green-500 text-white px-4 py-2 rounded">
-              {isSubmitting ? 'Submitting...' : 'Confirm & Create'}
-            </button>
-          </div>
+          {step === 3 && (
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--nova-text-primary)', marginBottom: 16 }}>Review & Confirm</h3>
+              <div style={{
+                background: 'var(--nova-bg-base)',
+                border: '1px solid var(--nova-border)',
+                borderRadius: 8, padding: 16,
+                display: 'flex', flexDirection: 'column', gap: 10,
+                marginBottom: 20, fontSize: '0.875rem',
+              }}>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>Organization:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500, wordBreak: 'break-all' }}>{organizationId}</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>Company:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500, wordBreak: 'break-all' }}>{companyId}</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>Type:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500 }}>{formData.type}</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>Name:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500 }}>{formData.name}</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>External ID:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500 }}>{formData.externalId || '—'}</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>Location:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500 }}>{formData.location || '—'}</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ color: 'var(--nova-text-muted)', minWidth: 140 }}>Responsible:</span>
+                  <span style={{ color: 'var(--nova-text-primary)', fontWeight: 500 }}>{formData.responsiblePerson || '—'}</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button onClick={handleBack} disabled={isSubmitting} className="nova-btn nova-btn-ghost">← Back</button>
+                <button onClick={handleSubmit} disabled={isSubmitting} className="nova-btn nova-btn-primary">
+                  {isSubmitting ? 'Submitting…' : 'Confirm & Create'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

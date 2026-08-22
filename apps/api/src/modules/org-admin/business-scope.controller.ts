@@ -1,14 +1,15 @@
-import { Controller, Post, Body, Param, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Patch, Body, Param, UseGuards, Req, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { BusinessScopeService } from './business-scope.service';
 import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
+import { OrgMemberGuard } from '../access-control/guards/org-member.guard';
 import { BusinessScopeType } from '@prisma/client';
 
 @Controller('org-admin/:organizationId/companies/:companyId/scopes')
-@UseGuards(OrgAdminGuard)
 export class BusinessScopeController {
   constructor(private readonly businessScopeService: BusinessScopeService) {}
 
   @Post()
+  @UseGuards(OrgAdminGuard)
   async createScope(
     @Param('organizationId') organizationId: string,
     @Param('companyId') companyId: string,
@@ -35,5 +36,32 @@ export class BusinessScopeController {
     if (typeof body.responsiblePerson === 'string') payload.responsiblePerson = body.responsiblePerson;
 
     return this.businessScopeService.createScope(payload);
+  }
+
+  @Patch(':id')
+  @UseGuards(OrgMemberGuard)
+  async updateScope(
+    @Param('organizationId') organizationId: string,
+    @Param('companyId') companyId: string,
+    @Param('id') id: string,
+    @Body() body: { name: string },
+    @Req() req: any
+  ) {
+    if (typeof body.name !== 'string' || !body.name.trim()) {
+      throw new BadRequestException('name is required');
+    }
+
+    const membership = req.membership;
+    if (membership.role === 'USER') {
+      const grants = membership.grants;
+      if (!grants?.capabilities?.includes('write')) {
+        throw new ForbiddenException('You do not have write permissions');
+      }
+      if (Array.isArray(grants?.scopes) && !grants.scopes.includes(id)) {
+        throw new ForbiddenException('You do not have access to edit this scope');
+      }
+    }
+
+    return this.businessScopeService.updateScope(organizationId, companyId, id, body.name);
   }
 }

@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service';
 import { EmailService } from '../email/email.service';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
-import { SYSTEM_ORGANIZATION_ID } from '../../common/constants';
+import { SYSTEM_ORGANIZATION_ID, EvidenceActions } from '../../common/constants';
 
 @Injectable()
 export class AuthService {
@@ -97,24 +97,37 @@ export class AuthService {
       return null;
     }
 
-    // Since identity table has no RLS, this worked.
-    // However, organization_member has RLS! But wait, we want to list all organizations for this identity.
-    // This is a global system action, so we bypass RLS using executeAsPlatformAdmin,
-    // or better, since a user is just querying their own memberships, we can executeAsPlatformAdmin just for this.
     const memberships = await this.prisma.executeAsPlatformAdmin((tx) => {
       return tx.organizationMember.findMany({
         where: { identityId: session.identityId },
-        include: { organization: true }
+        include: { 
+          organization: {
+            include: {
+              evidence: {
+                where: { action: EvidenceActions.SUSPEND_ORGANIZATION },
+                orderBy: { createdAt: 'desc' },
+                take: 1
+              }
+            }
+          } 
+        }
       });
     });
 
+    const activeMemberships = memberships.filter(m => m.organization.accessStatus !== 'DISABLED');
+
     return {
       identity: session.identity,
-      organizations: memberships.map(m => ({
+      organizations: activeMemberships.map(m => ({
         id: m.organization.id,
         name: m.organization.name,
         role: m.role,
         status: m.status,
+        grants: m.grants ?? null,
+        accessStatus: m.organization.accessStatus,
+        suspensionReason: m.organization.accessStatus === 'SUSPENDED' && m.organization.evidence.length > 0
+          ? m.organization.evidence[0]?.reason ?? null
+          : null
       }))
     };
   }

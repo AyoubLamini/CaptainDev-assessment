@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 function getCookie(name: string) {
@@ -10,14 +9,13 @@ function getCookie(name: string) {
   return undefined;
 }
 
-export function LogoutButton() {
-  const router = useRouter();
+export function LogoutButton({ variant = 'default' }: { variant?: 'default' | 'sidebar' }) {
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
     setLoading(true);
     try {
-      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const csrfToken = (getCookie('nova_csrf') || getCookie('__Host-csrf'));
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
@@ -33,8 +31,6 @@ export function LogoutButton() {
       });
 
       if (res.ok) {
-        // Force a hard refresh to clear server component state/cookies, or redirect to login.
-        // Doing a window.location.href ensures all server components re-render correctly.
         window.location.href = '/login';
       } else {
         console.error('Failed to log out');
@@ -46,13 +42,43 @@ export function LogoutButton() {
     }
   };
 
+  if (variant === 'sidebar') {
+    return (
+      <button
+        onClick={handleLogout}
+        disabled={loading}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '8px 10px',
+          background: 'transparent',
+          border: '1px solid var(--nova-border)',
+          borderRadius: 8,
+          color: 'var(--nova-text-secondary)',
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.5 : 1,
+          transition: 'all 0.12s ease',
+        }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        {loading ? 'Logging out…' : 'Log out'}
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="ml-4 px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+      className="nova-btn nova-btn-ghost nova-btn-sm"
     >
-      {loading ? 'Logging out...' : 'Log out'}
+      {loading ? 'Logging out…' : 'Log out'}
     </button>
   );
 }

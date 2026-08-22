@@ -54,16 +54,17 @@ export class CollaboratorInvitationService {
         }
       }
 
-      // Invalidate existing pending invitations for this email in this org
+      // Invalidate existing pending invitations for this email in this org (mark as superseded via consumedAt)
       await tx.organizationInvitation.updateMany({
         where: {
           organizationId,
           email,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() }
         },
         data: {
-          consumedAt: new Date(), // Mark as consumed to invalidate
+          consumedAt: new Date(), // Mark as superseded (consumed = superseded by new invite)
         }
       });
 
@@ -126,17 +127,55 @@ export class CollaboratorInvitationService {
         orderBy: { createdAt: 'desc' }
       });
     });
-    
-    return invitations.map(inv => ({
-      id: inv.id,
-      email: inv.email,
-      role: inv.role,
-      state: inv.consumedAt ? 'consumed_or_revoked' : (inv.expiresAt < new Date() ? 'expired' : 'pending'),
-      expiresAt: inv.expiresAt,
-      consumedAt: inv.consumedAt,
-      createdAt: inv.createdAt,
-      grants: inv.grants
-    }));
+
+    const now = new Date();
+
+    // Compute proper state for each invitation:
+    // - revokedAt set → REVOKED
+    // - consumedAt set AND revokedAt null → ACCEPTED or SUPERSEDED (consumed by resend/new invite)
+    // - expiresAt < now AND consumedAt null AND revokedAt null → EXPIRED
+    // - otherwise → PENDING
+
+    // Build a map of latest createdAt per email to detect superseded records
+    const latestByEmail = new Map<string, Date>();
+    for (const inv of invitations) {
+      const existing = latestByEmail.get(inv.email);
+      if (!existing || inv.createdAt > existing) {
+        latestByEmail.set(inv.email, inv.createdAt);
+      }
+    }
+
+    return invitations.map(inv => {
+      let state: 'PENDING' | 'EXPIRED' | 'ACCEPTED' | 'REVOKED' | 'SUPERSEDED';
+
+      if (inv.revokedAt) {
+        state = 'REVOKED';
+      } else if (inv.consumedAt) {
+        // Check if there's a newer invitation for same email (means this was superseded by resend)
+        const latestDate = latestByEmail.get(inv.email);
+        if (latestDate && latestDate > inv.createdAt) {
+          state = 'SUPERSEDED';
+        } else {
+          state = 'ACCEPTED';
+        }
+      } else if (inv.expiresAt < now) {
+        state = 'EXPIRED';
+      } else {
+        state = 'PENDING';
+      }
+
+      return {
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        state,
+        expiresAt: inv.expiresAt,
+        consumedAt: inv.consumedAt,
+        revokedAt: inv.revokedAt ?? null,
+        createdAt: inv.createdAt,
+        grants: inv.grants
+      };
+    });
   }
 
   async resendInvitation(
@@ -152,13 +191,14 @@ export class CollaboratorInvitationService {
           id: invitationId,
           organizationId,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() }
         },
         include: { organization: true }
       });
 
       if (!existing) {
-        throw new NotFoundException('Invitation not found or already consumed');
+        throw new NotFoundException('Invitation not found or already consumed/revoked/expired');
       }
 
       const rawToken = crypto.randomBytes(32).toString('hex');
@@ -166,13 +206,13 @@ export class CollaboratorInvitationService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      // Invalidate the old invitation
+      // Mark old invitation as superseded (via consumedAt — NOT revokedAt)
       await tx.organizationInvitation.update({
         where: { id: existing.id },
         data: { consumedAt: new Date() }
       });
 
-      // Create new one
+      // Create new one with same role/grants
       const newInv = await tx.organizationInvitation.create({
         data: {
           organizationId,
@@ -190,7 +230,7 @@ export class CollaboratorInvitationService {
         existing.email,
         'collaborator-invitation',
         {
-          organizationName: existing.organization.name,
+          organizationName: (existing as any).organization.name,
           inviteUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${rawToken}&type=collaborator`
         }
       );
@@ -233,17 +273,19 @@ export class CollaboratorInvitationService {
           id: invitationId,
           organizationId,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: { gt: new Date() }
         }
       });
 
       if (!existing) {
-        throw new NotFoundException('Invitation not found or already consumed');
+        throw new NotFoundException('Invitation not found or already consumed/revoked/expired');
       }
 
+      // Use revokedAt (not consumedAt) to clearly mark as admin-revoked
       await tx.organizationInvitation.update({
         where: { id: existing.id },
-        data: { consumedAt: new Date() }
+        data: { revokedAt: new Date() }
       });
 
       await tx.evidence.create({
@@ -260,7 +302,3 @@ export class CollaboratorInvitationService {
     });
   }
 }
-
-
-
-

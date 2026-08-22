@@ -68,4 +68,37 @@ export class BusinessScopeService {
       }
     });
   }
+  async updateScope(organizationId: string, companyId: string, scopeId: string, name: string) {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      // First check if scope exists and belongs to the company
+      const scope = await tx.businessScope.findFirst({
+        where: {
+          id: scopeId,
+          companyId,
+          organizationId,
+        },
+      });
+
+      if (!scope) {
+        throw new ConflictException('Business Scope not found.');
+      }
+
+      try {
+        return await tx.businessScope.update({
+          where: {
+            organizationId_id: {
+              organizationId,
+              id: scopeId,
+            }
+          },
+          data: { name: name.trim() },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          throw new ConflictException('A Business Scope with these details already exists.');
+        }
+        throw error;
+      }
+    });
+  }
 }

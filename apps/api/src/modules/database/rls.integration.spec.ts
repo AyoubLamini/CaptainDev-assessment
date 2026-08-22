@@ -49,7 +49,10 @@ describe('RLS Integration', () => {
     });
 
     // Assert failing closed (without context)
-    const allCompanies = await prisma.company.findMany();
+    const allCompanies = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL ROLE "nova_app"`;
+      return tx.company.findMany();
+    });
     expect(allCompanies).toHaveLength(0); // Standard client has no context, RLS should block reading
   });
 });

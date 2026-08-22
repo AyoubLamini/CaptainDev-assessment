@@ -1,35 +1,70 @@
-# Assessment Submission
+# CaptainDev Assessment Submission
 
-## Delivered Scope
-This submission implements the complete vertical slice for the first two NOVA modules as prescribed:
-1. **SaaS Foundation & Platform Administration** (Epics 1-3)
-2. **Client-side Collaborative Administration** (Epics 4-5)
+This submission implements the required vertical slices for the CaptainDev NOVA SaaS technical assessment, covering SaaS Foundation & Platform Administration and Client-side Collaborative Administration. It delivers secure authentication, strict multi-tenant data isolation via PostgreSQL RLS, organization lifecycle management, and a comprehensive Next.js administration dashboard.
 
-Key features delivered include:
-- Reproducible local bootstrap, migrations, and synthetic seed data.
-- First-party email/password login, secure server-side session management (including rotation, brute-force protection, and explicit access revocation).
-- Complete Resend email integration for Invitation and Password Reset flows.
-- Organization provisioning, activation, and suspension/disablement lifecycle.
-- Complete domain modeling for Organizations, Companies, and Business Scopes with strict, tenant-isolated PostgreSQL RLS constraints.
-- Collaborative administration: Invitations (with permissions limits), Suspension, Reactivation, Admin Promotion, and Atomic Ownership Transfer.
-- Platform interventions scoped narrowly to ensure platform administrators do not act as general tenant bypasses.
+## Project Prerequisites & Setup Instructions
 
-## Deferred Items & Known Limitations
-- Optional enhancement: Real-time visual invalidation (WebSocket/SSE) in already-open browsers was deferred in favor of immediate server-side refusal.
-- Resend is configured using a generic environment key for testing. The email delivery requires the tester to set a real `RESEND_API_KEY` and a verified `EMAIL_SENDER`.
+### Prerequisites
+- **Node.js**: >= 22.0.0
+- **Package Manager**: pnpm (v10.28.2)
+- **Database**: PostgreSQL
+- **Email Provider**: Resend API Key
 
-## AI-Assisted Workflow
-This submission was finalized using an AI coding assistant (Agentic AI) which audited the codebase against `ASSESSMENT.md`, created an implementation plan, and systematically addressed critical blockers such as:
-1. Missing `suspend/reactivate/commercial status` APIs.
-2. End-to-End tests via Playwright for critical auth and collaboration flows.
-3. Bug fixes in `Req` user identity extraction and password reset token expiry lengths.
-4. Implementing the missing `/accept-invitation` unification for collaborators.
-5. Scrubbing secrets and generating `.env.example`.
+### Installation & Environment
+1. Ensure your local PostgreSQL database is running. If you want to use the provided Docker setup:
+   ```bash
+   docker-compose up -d
+   ```
+2. Install project dependencies from the root:
+   ```bash
+   pnpm install
+   ```
+3. Set up your environment variables by copying the example files:
+   ```bash
+   cp .env.example .env
+   cp apps/web/.env.example apps/web/.env
+   ```
+   *Note: Our implementation securely enforces RLS by dropping privileges to `nova_app` during transactions. You do NOT need to configure a special database user in your `.env`—the default `postgres` superuser connection string works perfectly out of the box and remains secure!*
 
-## Setup Caveats
-- Ensure you use a verified email address for your Resend testing to successfully receive emails.
-- To freshly migrate and seed the database locally, use: `pnpm --filter @nova/api prisma migrate reset --force`
-- For local development, HTTP cookies are allowed, but production requires HTTPS for `__Host-` prefixed cookies to be accepted by the browser.
+### Database Setup, Migrations & Seeding
+Run the following commands to initialize the database schema, apply all security roles, seed test data, and bootstrap the platform administrator:
+```bash
+# Apply database schema and setup the `nova_app` restrictive role
+pnpm --filter @nova/api prisma migrate deploy
+
+# Seed the database with synthetic organization data
+pnpm --filter @nova/api prisma db seed
+
+# Bootstrap the platform administrator (Requires ADMIN_EMAIL and ADMIN_PASSWORD in .env)
+pnpm --filter @nova/api run bootstrap
+```
+
+### Running the Services
+Start the backend API and frontend web application in separate terminal windows:
+```bash
+# Start the NestJS API (runs on port 3001)
+pnpm --filter @nova/api run start:dev
+
+# Start the Next.js Web App (runs on port 3000)
+pnpm --filter @nova/web run dev
+```
+*Note: For local development, HTTP cookies are allowed, but production requires HTTPS for `__Host-` prefixed cookies.*
+
+### Testing Commands
+To execute the test suites across the project:
+```bash
+# Run all tests (API and Web)
+pnpm test
+
+# Run only Backend (API) Unit & Integration Tests (Vitest)
+pnpm --filter @nova/api run test
+
+# Run only Frontend (Web) End-to-End Tests (Playwright)
+pnpm --filter @nova/web run test
+
+# Run typechecking
+pnpm typecheck
+```
 
 ## Test Results
 - Linting and Type Checking: Passed

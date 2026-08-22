@@ -76,12 +76,27 @@ export class CompanyService {
     });
   }
 
-  async getCompanies(organizationId: string) {
+  async getCompanies(organizationId: string, membership?: any) {
+    const grants = membership?.grants as { scopes?: string[] } | null | undefined;
+    const isRestrictedUser = membership?.role === 'USER' && grants && Array.isArray(grants.scopes);
+    const allowedScopeIds: string[] | undefined = isRestrictedUser ? grants!.scopes : undefined;
+
     return this.prisma.executeAsTenant(organizationId, async (tx) => {
-      return tx.company.findMany({
+      const companies = await tx.company.findMany({
         where: { organizationId },
-        include: { scopes: true }
+        include: {
+          scopes: allowedScopeIds
+            ? { where: { id: { in: allowedScopeIds } } }
+            : true
+        }
       });
+
+      // If user has scope restrictions, only return companies that have at least one authorized scope
+      if (allowedScopeIds) {
+        return companies.filter(c => c.scopes.length > 0);
+      }
+
+      return companies;
     });
   }
 }

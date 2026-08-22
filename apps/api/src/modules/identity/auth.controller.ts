@@ -13,6 +13,10 @@ export class AuthController {
 
   @Get('csrf')
   getCsrfToken(@Res({ passthrough: true }) res: Response) {
+    if (!isProduction) {
+      res.clearCookie('__Host-csrf', { path: '/' });
+      res.clearCookie('__Host-session', { path: '/' });
+    }
     const csrfToken = crypto.randomBytes(32).toString('base64url');
     res.cookie(CSRF_COOKIE, csrfToken, {
       secure: isProduction,

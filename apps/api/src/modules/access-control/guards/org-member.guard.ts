@@ -6,8 +6,13 @@ import { Request } from 'express';
 const isProduction = process.env.NODE_ENV === 'production';
 const SESSION_COOKIE = isProduction ? '__Host-session' : 'nova_session';
 
+/**
+ * OrgMemberGuard — allows any active member (USER, ADMIN, OWNER) to access org resources.
+ * Use this on read-only or user-facing endpoints.
+ * Admin-only mutations should still use OrgAdminGuard.
+ */
 @Injectable()
-export class OrgAdminGuard implements CanActivate {
+export class OrgMemberGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,8 +35,10 @@ export class OrgAdminGuard implements CanActivate {
     }
 
     const orgIdHeader = request.headers['x-organization-id'];
-    const organizationId = String(request.params.organizationId || (Array.isArray(orgIdHeader) ? orgIdHeader[0] : orgIdHeader));
-    
+    const organizationId = String(
+      request.params.organizationId || (Array.isArray(orgIdHeader) ? orgIdHeader[0] : orgIdHeader)
+    );
+
     if (!organizationId || organizationId === 'undefined') {
       throw new BadRequestException('Organization ID is required');
     }
@@ -40,7 +47,7 @@ export class OrgAdminGuard implements CanActivate {
       return tx.organizationMember.findUnique({
         where: {
           organizationId_identityId: {
-            organizationId: organizationId,
+            organizationId,
             identityId: session.identityId,
           }
         },
@@ -48,12 +55,13 @@ export class OrgAdminGuard implements CanActivate {
       });
     });
 
-    if (!membership || (membership.role !== 'ADMIN' && membership.role !== 'OWNER')) {
-      throw new ForbiddenException('Organization Administrator or Owner access required');
+    // Any role is accepted — USER, ADMIN, OWNER
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this organization');
     }
 
     if (membership.status !== 'ACTIVE') {
-      throw new ForbiddenException('Member is not active');
+      throw new ForbiddenException('Your membership is not active');
     }
 
     if (membership.organization.accessStatus === 'SUSPENDED') {
@@ -64,7 +72,7 @@ export class OrgAdminGuard implements CanActivate {
       throw new ForbiddenException('Organization is disabled');
     }
 
-    // Attach identity, session, and organizationId to request
+    // Attach identity, session, organizationId, and membership to request
     (request as any).identity = session.identity;
     (request as any).session = session;
     (request as any).organizationId = organizationId;

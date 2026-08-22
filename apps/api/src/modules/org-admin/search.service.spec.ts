@@ -13,6 +13,7 @@ describe('SearchService', () => {
         {
           provide: PrismaService,
           useValue: {
+            executeAsTenant: vi.fn().mockImplementation((orgId, cb) => cb(prisma)),
             $transaction: vi.fn().mockImplementation((promises) => Promise.all(promises)),
             company: {
               findMany: vi.fn(),
@@ -37,7 +38,7 @@ describe('SearchService', () => {
     vi.mocked(prisma.businessScope.findMany).mockResolvedValue([{ id: 's1', name: 'Matched Scope' }] as any);
     vi.mocked(prisma.businessScope.count).mockResolvedValue(1);
 
-    const result = await service.search('org1', 'Match');
+    const result = await service.search('org1', null, 'Match');
 
     expect(result.companies.data).toHaveLength(1);
     expect(result.scopes.data).toHaveLength(1);
@@ -69,7 +70,7 @@ describe('SearchService', () => {
     vi.mocked(prisma.businessScope.findMany).mockResolvedValue([{ id: 's1' }] as any);
     vi.mocked(prisma.businessScope.count).mockResolvedValue(1);
 
-    const result = await service.search('org1', '');
+    const result = await service.search('org1', null, '');
     expect(result.companies.totalCount).toBe(2);
 
     expect(prisma.company.findMany).toHaveBeenCalledWith({
@@ -85,7 +86,7 @@ describe('SearchService', () => {
     vi.mocked(prisma.businessScope.findMany).mockResolvedValue([] as any);
     vi.mocked(prisma.businessScope.count).mockResolvedValue(0);
 
-    const result = await service.search('org1', 'OtherOrgSecret');
+    const result = await service.search('org1', null, 'OtherOrgSecret');
     expect(result.companies.totalCount).toBe(0);
 
     expect(prisma.company.findMany).toHaveBeenCalledWith(expect.objectContaining({

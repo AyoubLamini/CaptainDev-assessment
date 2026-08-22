@@ -13,6 +13,8 @@ describe('CollaboratorInvitationService', () => {
   beforeEach(async () => {
     prisma = {
       $transaction: vi.fn((cb) => cb(prisma)),
+      executeAsPlatformAdmin: vi.fn((cb) => cb(prisma)),
+      executeAsTenant: vi.fn((orgId, cb) => cb(prisma)),
       organization: { findUnique: vi.fn() },
       identity: { findUnique: vi.fn() },
       organizationMember: { findUnique: vi.fn() },
@@ -52,7 +54,7 @@ describe('CollaboratorInvitationService', () => {
       ]);
       const res = await service.listInvitations('org1');
       expect(res).toHaveLength(1);
-      expect(res[0]?.state).toBe('pending');
+      expect(res[0]?.state).toBe('PENDING');
     });
   });
 

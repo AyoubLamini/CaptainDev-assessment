@@ -1,9 +1,5 @@
-import type { JSX } from 'react';
+import { redirect } from 'next/navigation';
 
-export default function Home(): JSX.Element {
-  return (
-    <main>
-      <h1>NOVA</h1>
-    </main>
-  );
+export default function Home() {
+  redirect('/login');
 }

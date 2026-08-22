@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useToast } from '@/components/Toast';
 
 type Company = {
   id: string;
@@ -23,23 +24,52 @@ function getCookie(name: string) {
 }
 
 export default function CompaniesPage() {
+  const { addToast } = useToast();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [organizationId, setOrganizationId] = useState('');
   const [organizations, setOrganizations] = useState<any[]>([]);
-  const [name, setName] = useState('');
+  const [orgRole, setOrgRole] = useState<string | null>(null);
+  const [orgGrants, setOrgGrants] = useState<{ capabilities?: string[], scopes?: string[] } | null>(null);
+  const [selectedItem, setSelectedItem] = useState<{ type: 'company' | 'scope'; company: Company; scopeId?: string } | null>(null);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+
+  // Create company modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Edit company modal
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [editName, setEditName] = useState('');
+
+  // Edit scope modal
+  const [editingScope, setEditingScope] = useState<{ id: string, name: string, companyId: string } | null>(null);
+  const [editScopeName, setEditScopeName] = useState('');
 
   const fetchCompanies = async () => {
     try {
       const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies`, {
         credentials: 'include',
-        headers: {
-          'x-organization-id': organizationId
-        }
+        headers: { 'x-organization-id': organizationId },
       });
       if (res.ok) {
         const data = await res.json();
         setCompanies(data);
+        // Auto-expand all by default
+        const ids = new Set<string>(data.map((c: Company) => c.id));
+        setExpandedCompanies(ids);
+        
+        setSelectedItem(prev => {
+          if (!prev) return null;
+          const updatedCompany = data.find((c: Company) => c.id === prev.company.id);
+          if (!updatedCompany) return null;
+          if (prev.type === 'company') {
+            return { type: 'company', company: updatedCompany };
+          } else {
+            const scopeStillExists = updatedCompany.scopes?.some((s: any) => s.id === prev.scopeId);
+            return scopeStillExists ? { type: 'scope', company: updatedCompany, scopeId: prev.scopeId } : null;
+          }
+        });
       }
     } catch (e) {
       console.error(e);
@@ -55,6 +85,8 @@ export default function CompaniesPage() {
           if (data.organizations && data.organizations.length > 0) {
             setOrganizations(data.organizations);
             setOrganizationId(data.organizations[0].id);
+            setOrgRole(data.organizations[0].role);
+            setOrgGrants(data.organizations[0].grants);
           }
         }
       } catch (e) {
@@ -65,36 +97,43 @@ export default function CompaniesPage() {
   }, []);
 
   useEffect(() => {
-    if (organizationId) {
-      fetchCompanies();
-    }
+    if (organizationId) fetchCompanies();
   }, [organizationId]);
+
+  const toggleCompany = (id: string) => {
+    setExpandedCompanies(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
-      const headers: HeadersInit = { 
-        'Content-Type': 'application/json',
-        'x-organization-id': organizationId
-      };
+      const headers: HeadersInit = { 'Content-Type': 'application/json', 'x-organization-id': organizationId };
       if (csrfToken) headers['x-csrf-token'] = csrfToken;
 
       const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies`, {
-        method: 'POST',
-        credentials: 'include',
-        headers,
-        body: JSON.stringify({ name }),
+        method: 'POST', credentials: 'include', headers,
+        body: JSON.stringify({ name: newCompanyName }),
       });
       if (res.ok) {
-        setName('');
+        setNewCompanyName('');
+        setShowCreateModal(false);
+        addToast('success', 'Company created', `"${newCompanyName}" has been added.`);
         fetchCompanies();
       } else {
         const err = await res.json();
-        alert(`Failed to create: ${err.message}`);
+        addToast('error', 'Creation failed', err.message);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -103,24 +142,57 @@ export default function CompaniesPage() {
     if (!editingCompany) return;
     try {
       const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
-      const headers: HeadersInit = { 
-        'Content-Type': 'application/json',
-        'x-organization-id': organizationId
-      };
+      const headers: HeadersInit = { 'Content-Type': 'application/json', 'x-organization-id': organizationId };
       if (csrfToken) headers['x-csrf-token'] = csrfToken;
 
       const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${editingCompany.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers,
-        body: JSON.stringify({ name: editingCompany.name }),
+        method: 'PUT', credentials: 'include', headers,
+        body: JSON.stringify({ name: editName }),
       });
       if (res.ok) {
         setEditingCompany(null);
+        addToast('success', 'Company updated');
         fetchCompanies();
       } else {
         const err = await res.json();
-        alert(`Failed to update: ${err.message}`);
+        addToast('error', 'Update failed', err.message);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdateScope = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingScope) return;
+    try {
+      const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
+      const headers: HeadersInit = { 'Content-Type': 'application/json', 'x-organization-id': organizationId };
+      if (csrfToken) headers['x-csrf-token'] = csrfToken;
+
+      const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${editingScope.companyId}/scopes/${editingScope.id}`, {
+        method: 'PATCH', credentials: 'include', headers,
+        body: JSON.stringify({ name: editScopeName }),
+      });
+      if (res.ok) {
+        setEditingScope(null);
+        addToast('success', 'Scope updated');
+        fetchCompanies();
+        // Update selectedItem if it's the currently viewed scope
+        if (selectedItem?.type === 'scope' && selectedItem.scopeId === editingScope.id) {
+            setSelectedItem({
+              ...selectedItem,
+              company: {
+                ...selectedItem.company,
+                ...(selectedItem.company.scopes ? {
+                  scopes: selectedItem.company.scopes.map(s => s.id === editingScope.id ? { ...s, name: editScopeName } : s)
+                } : {})
+              }
+            });
+        }
+      } else {
+        const err = await res.json();
+        addToast('error', 'Update failed', err.message);
       }
     } catch (e) {
       console.error(e);
@@ -130,21 +202,18 @@ export default function CompaniesPage() {
   const handleDeactivate = async (id: string) => {
     try {
       const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
-      const headers: HeadersInit = {
-        'x-organization-id': organizationId
-      };
+      const headers: HeadersInit = { 'x-organization-id': organizationId };
       if (csrfToken) headers['x-csrf-token'] = csrfToken;
 
       const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${id}/deactivate`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers
+        method: 'PATCH', credentials: 'include', headers,
       });
       if (res.ok) {
+        addToast('success', 'Company deactivated');
         fetchCompanies();
       } else {
         const err = await res.json();
-        alert(`Failed to deactivate: ${err.message}`);
+        addToast('error', 'Deactivation failed', err.message);
       }
     } catch (e) {
       console.error(e);
@@ -154,175 +223,362 @@ export default function CompaniesPage() {
   const handleReactivate = async (company: Company) => {
     try {
       const csrfToken = (getCookie('__Host-csrf') || getCookie('nova_csrf'));
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'x-organization-id': organizationId
-      };
+      const headers: HeadersInit = { 'Content-Type': 'application/json', 'x-organization-id': organizationId };
       if (csrfToken) headers['x-csrf-token'] = csrfToken;
 
       const res = await fetch(`http://localhost:3001/org-admin/${organizationId}/companies/${company.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers,
+        method: 'PUT', credentials: 'include', headers,
         body: JSON.stringify({ name: company.name, status: 'ACTIVE' }),
       });
       if (res.ok) {
+        addToast('success', 'Company reactivated');
         fetchCompanies();
       } else {
         const err = await res.json();
-        alert(`Failed to reactivate: ${err.message}`);
+        addToast('error', 'Reactivation failed', err.message);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
+  const selectedScope = selectedItem?.type === 'scope' && selectedItem.scopeId
+    ? selectedItem.company.scopes?.find(s => s.id === selectedItem.scopeId)
+    : null;
+
+  const currentOrg = organizations.find(o => o.id === organizationId);
+  const isSuspended = currentOrg?.accessStatus === 'SUSPENDED';
+
+  if (isSuspended) {
+    return (
+      <div>
+        <div style={{ padding: 40, textAlign: 'center' }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--nova-status-suspended)" strokeWidth="1.5" style={{ margin: '0 auto 16px' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--nova-text-primary)', marginBottom: 8 }}>
+            Organization suspended by platform admin
+          </h2>
+          <p style={{ color: 'var(--nova-text-secondary)', maxWidth: 400, margin: '0 auto' }}>
+            Reason: {currentOrg.suspensionReason || 'No reason provided.'}
+          </p>
+        </div>
+        
+        {organizations.length > 1 && (
+          <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <select
+              value={organizationId}
+              onChange={(e) => setOrganizationId(e.target.value)}
+              className="nova-select"
+              style={{ maxWidth: 300, display: 'inline-block' }}
+            >
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>{org.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Manage Companies</h1>
-      
-      <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Organization (Context):
-        </label>
-        {organizations.length > 0 ? (
-          <select
-            value={organizationId}
-            onChange={(e) => setOrganizationId(e.target.value)}
-            className="w-full sm:max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
-          >
-            {organizations.map(org => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input 
-            value={organizationId} 
-            onChange={e => setOrganizationId(e.target.value)} 
-            placeholder="Loading organizations or none found..."
-            className="w-full sm:max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <div className="nova-section-label">Administration</div>
+          <h1 className="nova-section-title">Companies & Scopes</h1>
+          <p className="nova-section-subtitle">Structure the companies and operations of your Organization</p>
+        </div>
+        {(orgRole === 'ADMIN' || orgRole === 'OWNER') && (
+          <button onClick={() => setShowCreateModal(true)} className="nova-btn nova-btn-primary" style={{ padding: '10px 20px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add Company
+          </button>
         )}
       </div>
 
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Create Company</h2>
-        <form onSubmit={handleCreate} className="flex gap-4 items-end">
-          <div className="flex-1 sm:max-w-xs">
-            <label htmlFor="name" className="sr-only">Company Name</label>
-            <input 
-              id="name"
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-              placeholder="Company Name" 
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              required 
-            />
-          </div>
-          <button 
-            type="submit"
-            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      {/* Org selector (minimal) */}
+      {organizations.length > 1 && (
+        <div style={{ marginBottom: 20 }}>
+          <select
+            value={organizationId}
+            onChange={(e) => setOrganizationId(e.target.value)}
+            className="nova-select"
+            style={{ maxWidth: 300 }}
           >
-            Create
-          </button>
-        </form>
-      </div>
-
-      {editingCompany && (
-        <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h2 className="text-lg font-semibold text-blue-900 mb-4">Edit Company</h2>
-          <form onSubmit={handleUpdate} className="flex gap-4 items-end">
-            <div className="flex-1 sm:max-w-xs">
-              <input 
-                value={editingCompany.name} 
-                onChange={e => setEditingCompany({ ...editingCompany, name: e.target.value })} 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                required 
-              />
-            </div>
-            <button 
-              type="submit"
-              className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Save
-            </button>
-            <button 
-              type="button" 
-              onClick={() => setEditingCompany(null)}
-              className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-          </form>
+            {organizations.map(org => (
+              <option key={org.id} value={org.id}>{org.name}</option>
+            ))}
+          </select>
         </div>
       )}
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Companies</h2>
-        <div className="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
-          <ul className="divide-y divide-gray-200">
-            {companies.map((c: Company) => (
-              <li key={c.id} className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-900">{c.name}</span>
-                  <span className={`text-xs px-2 py-1 mt-1 rounded-full w-max ${c.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                    {c.status}
-                  </span>
-                  {c.scopes && c.scopes.length > 0 && (
-                    <div className="mt-3 text-sm text-gray-500">
-                      <strong className="text-gray-700">Business Scopes:</strong>
-                      <ul className="list-disc list-inside mt-1 space-y-1">
-                        {c.scopes.map(s => (
-                          <li key={s.id}>
-                            <span className="font-medium text-gray-800">{s.name}</span> <span className="text-xs text-gray-400">({s.type})</span> - 
-                            <span className={`ml-1 text-xs ${s.status === 'ACTIVE' ? 'text-green-600' : 'text-gray-500'}`}>{s.status}</span>
-                          </li>
-                        ))}
-                      </ul>
+      <style>{`
+        @media (min-width: 1024px) {
+          .companies-grid { grid-template-columns: 2fr 1fr !important; }
+        }
+      `}</style>
+      <div className="companies-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+        {/* Left - Company List */}
+        <div className="nova-card">
+          {companies.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--nova-text-muted)' }}>
+              No companies found. Create one to get started.
+            </div>
+          ) : (
+            companies.map(company => (
+              <div key={company.id}>
+                {/* Company row */}
+                <div
+                  className="nova-row"
+                  style={{ cursor: 'pointer', justifyContent: 'space-between' }}
+                  onClick={() => {
+                    setSelectedItem({ type: 'company', company });
+                    toggleCompany(company.id);
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--nova-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-4h6v4" />
+                    </svg>
+                    <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--nova-text-primary)' }}>{company.name}</span>
+                    {company.scopes && company.scopes.length > 0 && (
+                      <span className="nova-btn nova-btn-ghost nova-btn-sm" style={{ pointerEvents: 'none', padding: '2px 8px', fontSize: '0.75rem' }}>
+                        {company.scopes.length} scope{company.scopes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {(orgRole === 'ADMIN' || orgRole === 'OWNER') && (
+                      <Link
+                        href={`/companies/${company.id}/scopes/new?orgId=${organizationId}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="nova-btn nova-btn-ghost nova-btn-sm"
+                      >
+                        + Add scope
+                      </Link>
+                    )}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--nova-text-muted)" strokeWidth="2" strokeLinecap="round"
+                      style={{ transform: expandedCompanies.has(company.id) ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Scopes (expanded) */}
+                {expandedCompanies.has(company.id) && company.scopes && company.scopes.map(scope => (
+                  <div
+                    key={scope.id}
+                    className={`nova-row${selectedItem?.type === 'scope' && selectedItem.scopeId === scope.id ? ' nova-row-selected' : ''}`}
+                    style={{ paddingLeft: 48, gap: 10 }}
+                    onClick={() => setSelectedItem({ type: 'scope', company, scopeId: scope.id })}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--nova-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" />
+                    </svg>
+                    <span style={{ fontWeight: 500, color: 'var(--nova-text-primary)', flex: 1 }}>{scope.name}</span>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--nova-text-muted)' }}>{scope.type}</span>
+                    <span className={`nova-badge ${scope.status === 'ACTIVE' ? 'nova-badge-active' : 'nova-badge-disabled'}`}>
+                      {scope.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Right — Detail */}
+        <div className="nova-card">
+          {selectedItem ? (
+            <div className="nova-card-body">
+              {selectedItem.type === 'company' ? (
+                <>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--nova-text-primary)', margin: '0 0 16px' }}>
+                    {selectedItem.company.name}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--nova-text-muted)', minWidth: 60 }}>Status:</span>
+                      <span className={`nova-badge ${selectedItem.company.status === 'ACTIVE' ? 'nova-badge-active' : 'nova-badge-disabled'}`}>
+                        {selectedItem.company.status}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--nova-text-muted)', minWidth: 60 }}>Scopes:</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--nova-text-primary)' }}>
+                        {selectedItem.company.scopes?.length || 0} business scope{(selectedItem.company.scopes?.length || 0) !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                  {(orgRole === 'ADMIN' || orgRole === 'OWNER') && (
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => { setEditingCompany(selectedItem.company); setEditName(selectedItem.company.name); }}
+                        className="nova-btn nova-btn-primary"
+                        style={{ flex: 1 }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                        </svg>
+                        Edit
+                      </button>
+                      {selectedItem.company.status === 'ACTIVE' ? (
+                        <button
+                          onClick={() => handleDeactivate(selectedItem.company.id)}
+                          className="nova-btn nova-btn-danger"
+                          style={{ flex: 1 }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                          </svg>
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReactivate(selectedItem.company)}
+                          className="nova-btn nova-btn-outline"
+                          style={{ flex: 1 }}
+                        >
+                          Reactivate
+                        </button>
+                      )}
                     </div>
                   )}
-                </div>
-                <div className="flex gap-2 mt-4 sm:mt-0">
-                  <button 
-                    onClick={() => setEditingCompany(c)}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Edit
-                  </button>
-                  {c.status === 'ACTIVE' ? (
-                    <button 
-                      onClick={() => handleDeactivate(c.id)}
-                      className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      Deactivate
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleReactivate(c)}
-                      className="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    >
-                      Reactivate
-                    </button>
+                </>
+              ) : selectedScope ? (
+                <>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--nova-text-primary)', margin: '0 0 16px' }}>
+                    {selectedScope.name}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--nova-text-muted)', minWidth: 70 }}>Company:</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--nova-text-primary)' }}>{selectedItem.company.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--nova-text-muted)', minWidth: 70 }}>Type:</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--nova-text-primary)' }}>{selectedScope.type}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--nova-text-muted)', minWidth: 70 }}>Status:</span>
+                      <span className={`nova-badge ${selectedScope.status === 'ACTIVE' ? 'nova-badge-active' : 'nova-badge-disabled'}`}>
+                        {selectedScope.status}
+                      </span>
+                    </div>
+                  </div>
+                  {(orgRole === 'ADMIN' || orgRole === 'OWNER' || (orgRole === 'USER' && orgGrants?.capabilities?.includes('write') && (orgGrants?.scopes?.length === 0 || orgGrants?.scopes?.includes(selectedScope.id)))) && (
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
+                      <button
+                        onClick={() => { setEditingScope({ id: selectedScope.id, name: selectedScope.name, companyId: selectedItem.company.id }); setEditScopeName(selectedScope.name); }}
+                        className="nova-btn nova-btn-primary"
+                        style={{ flex: 1 }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                        </svg>
+                        Edit
+                      </button>
+                    </div>
                   )}
-                  <Link 
-                    href={`/companies/${c.id}/scopes/new?orgId=${organizationId}`}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    Add Scope
-                  </Link>
-                </div>
-              </li>
-            ))}
-            {companies.length === 0 && (
-              <li className="p-4 sm:px-6 text-sm text-gray-500 text-center">
-                No companies found
-              </li>
-            )}
-          </ul>
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <div className="nova-card-body" style={{ textAlign: 'center', color: 'var(--nova-text-muted)', padding: 40 }}>
+              Select a company or scope to view details
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Create Company Modal */}
+      {showCreateModal && (
+        <div className="nova-modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="nova-modal" onClick={e => e.stopPropagation()}>
+            <div className="nova-modal-header">
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--nova-text-primary)', margin: 0 }}>Add Company</h3>
+            </div>
+            <form onSubmit={handleCreate}>
+              <div className="nova-modal-body">
+                <label className="nova-label">Company Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newCompanyName}
+                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  className="nova-input"
+                  placeholder="Enter company name"
+                />
+              </div>
+              <div className="nova-modal-footer">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="nova-btn nova-btn-ghost">Cancel</button>
+                <button type="submit" disabled={isCreating} className="nova-btn nova-btn-primary">
+                  {isCreating ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Company Modal */}
+      {editingCompany && (
+        <div className="nova-modal-overlay" onClick={() => setEditingCompany(null)}>
+          <div className="nova-modal" onClick={e => e.stopPropagation()}>
+            <div className="nova-modal-header">
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--nova-text-primary)', margin: 0 }}>Edit Company</h3>
+            </div>
+            <form onSubmit={handleUpdate}>
+              <div className="nova-modal-body">
+                <label className="nova-label">Company Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="nova-input"
+                />
+              </div>
+              <div className="nova-modal-footer">
+                <button type="button" onClick={() => setEditingCompany(null)} className="nova-btn nova-btn-ghost">Cancel</button>
+                <button type="submit" className="nova-btn nova-btn-primary">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Scope Modal */}
+      {editingScope && (
+        <div className="nova-modal-overlay" onClick={() => setEditingScope(null)}>
+          <div className="nova-modal" onClick={e => e.stopPropagation()}>
+            <div className="nova-modal-header">
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--nova-text-primary)', margin: 0 }}>Edit Business Scope</h3>
+            </div>
+            <form onSubmit={handleUpdateScope}>
+              <div className="nova-modal-body">
+                <label className="nova-label">Scope Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editScopeName}
+                  onChange={(e) => setEditScopeName(e.target.value)}
+                  className="nova-input"
+                />
+              </div>
+              <div className="nova-modal-footer">
+                <button type="button" onClick={() => setEditingScope(null)} className="nova-btn nova-btn-ghost">Cancel</button>
+                <button type="submit" className="nova-btn nova-btn-primary">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

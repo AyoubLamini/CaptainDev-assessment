@@ -16,6 +16,8 @@ describe('BusinessScopeService', () => {
         {
           provide: PrismaService,
           useValue: {
+            executeAsPlatformAdmin: vi.fn().mockImplementation((cb) => cb(prisma)),
+            executeAsTenant: vi.fn().mockImplementation((orgId, cb) => cb(prisma)),
             businessScope: {
               create: vi.fn(),
               findFirst: vi.fn(),

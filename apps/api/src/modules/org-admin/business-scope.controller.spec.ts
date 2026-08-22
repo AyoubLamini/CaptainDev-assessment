@@ -5,6 +5,8 @@ import { BadRequestException } from '@nestjs/common';
 import { OrgAdminGuard } from '../access-control/guards/org-admin.guard';
 import { BusinessScopeType } from '@prisma/client';
 
+import { PrismaService } from '../database/prisma.service';
+
 describe('BusinessScopeController', () => {
   let controller: BusinessScopeController;
   let service: BusinessScopeService;
@@ -18,6 +20,10 @@ describe('BusinessScopeController', () => {
           useValue: {
             createScope: vi.fn().mockResolvedValue({ id: 'test-id' }),
           },
+        },
+        {
+          provide: PrismaService,
+          useValue: {},
         },
       ],
     })

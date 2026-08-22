@@ -22,6 +22,8 @@ describe('InvitationService', () => {
           provide: PrismaService,
           useValue: {
             $transaction: vi.fn(),
+            executeAsPlatformAdmin: vi.fn().mockImplementation((cb) => cb(prisma)),
+            executeAsTenant: vi.fn().mockImplementation((orgId, cb) => cb(prisma)),
           },
         },
       ],
@@ -76,6 +78,12 @@ describe('InvitationService', () => {
         expect(options).toEqual({ isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return callback(mockTx as any);
       });
+      vi.mocked(prisma.executeAsPlatformAdmin).mockImplementation(async (callback) => {
+        return callback(mockTx as any);
+      });
+      vi.mocked(prisma.executeAsTenant).mockImplementation(async (orgId, callback) => {
+        return callback(mockTx as any);
+      });
 
       const result = await service.acceptInvitation(validDto);
 
@@ -86,6 +94,7 @@ describe('InvitationService', () => {
         where: {
           tokenHash,
           consumedAt: null,
+          revokedAt: null,
           expiresAt: expect.objectContaining({ gt: expect.any(Date) }),
         },
         include: { organization: true },
@@ -101,7 +110,7 @@ describe('InvitationService', () => {
         data: { identityId: 'identity_id', passwordHash: 'hashed_password' },
       });
       expect(mockTx.organizationMember.create).toHaveBeenCalledWith({
-        data: { organizationId: 'org_id', identityId: 'identity_id', role: 'ADMIN' },
+        data: { organizationId: 'org_id', identityId: 'identity_id', role: 'OWNER', status: 'ACTIVE' },
       });
       expect(mockTx.organization.update).toHaveBeenCalledWith({
         where: { id: 'org_id' },
@@ -123,6 +132,12 @@ describe('InvitationService', () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback, options) => {
         return callback(mockTx as any);
       });
+      vi.mocked(prisma.executeAsPlatformAdmin).mockImplementation(async (callback) => {
+        return callback(mockTx as any);
+      });
+      vi.mocked(prisma.executeAsTenant).mockImplementation(async (orgId, callback) => {
+        return callback(mockTx as any);
+      });
 
       await expect(service.acceptInvitation(validDto)).rejects.toThrow(BadRequestException);
     });
@@ -140,6 +155,12 @@ describe('InvitationService', () => {
       };
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback, options) => {
+        return callback(mockTx as any);
+      });
+      vi.mocked(prisma.executeAsPlatformAdmin).mockImplementation(async (callback) => {
+        return callback(mockTx as any);
+      });
+      vi.mocked(prisma.executeAsTenant).mockImplementation(async (orgId, callback) => {
         return callback(mockTx as any);
       });
 
@@ -162,6 +183,12 @@ describe('InvitationService', () => {
       };
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback, options) => {
+        return callback(mockTx as any);
+      });
+      vi.mocked(prisma.executeAsPlatformAdmin).mockImplementation(async (callback) => {
+        return callback(mockTx as any);
+      });
+      vi.mocked(prisma.executeAsTenant).mockImplementation(async (orgId, callback) => {
         return callback(mockTx as any);
       });
 

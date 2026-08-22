@@ -199,6 +199,7 @@ export class PlatformOrganizationsService {
         data: { accessStatus: OrganizationAccessStatus.DISABLED },
       });
 
+      // Revoke all sessions for members of this organization
       await this.authService.revokeSessionsForOrganization(organizationId);
 
       await tx.evidence.create({
@@ -283,8 +284,6 @@ export class PlatformOrganizationsService {
         where: { id: organizationId },
         data: { accessStatus: OrganizationAccessStatus.SUSPENDED },
       });
-
-      await this.authService.revokeSessionsForOrganization(organizationId);
 
       await tx.evidence.create({
         data: {

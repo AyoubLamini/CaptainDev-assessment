@@ -47,10 +47,6 @@ export class CollaboratorService {
       throw new NotFoundException('Collaborator not found');
     }
 
-    if (member.status !== 'ACTIVE') {
-      throw new BadRequestException('Inactive member');
-    }
-
     return member;
   }
 
@@ -196,6 +192,11 @@ export class CollaboratorService {
             throw new BadRequestException('Cannot suspend or remove the last active administrator');
           }
         }
+
+        // Revoke active sessions for this member's identity
+        await tx.session.deleteMany({
+          where: { identityId: member.identityId }
+        });
       }
 
       const updatedMember = await tx.organizationMember.update({
@@ -220,11 +221,7 @@ export class CollaboratorService {
         }
       });
 
-      if (status === 'SUSPENDED' || status === 'REMOVED') {
-        await tx.session.deleteMany({
-          where: { identityId: member.identityId },
-        });
-      }
+
 
       return updatedMember;
     });
@@ -370,22 +367,18 @@ export class CollaboratorService {
       }
 
       const proposals = await tx.ownershipTransferProposal.findMany({
-        where: { organizationId, status: 'PENDING' },
+        where: { organizationId, status: 'PENDING', expiresAt: { gt: new Date() } },
         orderBy: { createdAt: 'desc' }
       });
       
       const proposal = proposals[0];
 
       if (!proposal) {
-        throw new NotFoundException('No pending proposal found');
+        throw new NotFoundException('No active pending proposal found');
       }
 
       if (proposal.successorId !== member.id) {
         throw new ForbiddenException('You are not the designated successor');
-      }
-
-      if (proposal.expiresAt < new Date()) {
-        throw new BadRequestException('Proposal has expired');
       }
 
       const proposer = await tx.organizationMember.findUnique({
@@ -447,17 +440,13 @@ export class CollaboratorService {
       }
 
       const proposals = await tx.ownershipTransferProposal.findMany({
-        where: { organizationId, status: 'PENDING' },
+        where: { organizationId, status: 'PENDING', expiresAt: { gt: new Date() } },
         orderBy: { createdAt: 'desc' }
       });
 
       const proposal = proposals[0];
       if (!proposal) {
-        throw new NotFoundException('No pending proposal found');
-      }
-
-      if (proposal.expiresAt < new Date()) {
-        throw new BadRequestException('Proposal expired');
+        throw new NotFoundException('No active pending proposal found');
       }
 
       const updatedProposal = await tx.ownershipTransferProposal.update({
@@ -481,4 +470,25 @@ export class CollaboratorService {
   }
 
 
+  async getActiveOwnershipTransferProposal(organizationId: string) {
+    return this.prisma.executeAsTenant(organizationId, async (tx) => {
+      const proposals = await tx.ownershipTransferProposal.findMany({
+        where: {
+          organizationId,
+          status: 'PENDING',
+          expiresAt: { gt: new Date() }
+        },
+        include: {
+          proposer: {
+            include: { identity: { select: { id: true, email: true } } }
+          },
+          successor: {
+            include: { identity: { select: { id: true, email: true } } }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      return proposals[0] ?? null;
+    });
+  }
 }

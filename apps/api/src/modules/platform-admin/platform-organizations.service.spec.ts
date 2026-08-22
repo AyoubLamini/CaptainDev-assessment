@@ -3,6 +3,7 @@ import { PlatformOrganizationsService } from './platform-organizations.service';
 import { PrismaService } from '../database/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { AuthService } from '../identity/auth.service';
+import { EmailService } from '../email/email.service';
 import { vi } from 'vitest';
 import { UnauthorizedException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 
@@ -11,13 +12,16 @@ describe('PlatformOrganizationsService', () => {
   let prisma: any;
   let identityService: any;
   let authService: any;
+  let emailService: any;
 
   beforeEach(async () => {
     prisma = {
       $transaction: vi.fn((cb) => cb(prisma)),
+      executeAsPlatformAdmin: vi.fn((cb) => cb(prisma)),
+      executeAsTenant: vi.fn((orgId, cb) => cb(prisma)),
       organization: {
         create: vi.fn().mockResolvedValue({ id: 'org-1', name: 'Test', accessStatus: 'PROVISIONING', commercialStatus: 'ACTIVE' }),
-        findMany: vi.fn().mockResolvedValue([{ id: 'org-1', name: 'Test' }]),
+        findMany: vi.fn().mockResolvedValue([{ id: 'org-1', name: 'Test', members: [] }]),
         count: vi.fn().mockResolvedValue(1),
         findUnique: vi.fn().mockResolvedValue({ id: 'org-1', accessStatus: 'ACTIVE' }),
         update: vi.fn().mockResolvedValue({ id: 'org-1', accessStatus: 'DISABLED' }),
@@ -38,12 +42,17 @@ describe('PlatformOrganizationsService', () => {
       revokeSessionsForOrganization: vi.fn(),
     };
 
+    emailService = {
+      sendEmail: vi.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PlatformOrganizationsService,
         { provide: PrismaService, useValue: prisma },
         { provide: IdentityService, useValue: identityService },
         { provide: AuthService, useValue: authService },
+        { provide: EmailService, useValue: emailService },
       ],
     }).compile();
 
@@ -59,6 +68,7 @@ describe('PlatformOrganizationsService', () => {
 
     expect(prisma.organization.create).toHaveBeenCalledWith({
       data: {
+        id: expect.any(String),
         name: 'Test',
         accessStatus: 'PROVISIONING',
         commercialStatus: 'ACTIVE',

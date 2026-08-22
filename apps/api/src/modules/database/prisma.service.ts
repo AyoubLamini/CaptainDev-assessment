@@ -20,6 +20,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     callback: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
   ): Promise<T> {
     return this.$transaction(async (tx) => {
+      // Set the local role to a non-superuser to ensure RLS is enforced
+      await tx.$executeRaw`SET LOCAL ROLE "nova_app"`;
       // Set the local transaction variable for RLS securely
       await tx.$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
       
@@ -36,6 +38,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     callback: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
   ): Promise<T> {
     return this.$transaction(async (tx) => {
+      // Set the local role to a non-superuser to ensure RLS is enforced
+      await tx.$executeRaw`SET LOCAL ROLE "nova_app"`;
       // Set the local transaction variable for RLS securely
       await tx.$executeRaw`SELECT set_config('app.is_platform_admin', 'true', true)`;
       

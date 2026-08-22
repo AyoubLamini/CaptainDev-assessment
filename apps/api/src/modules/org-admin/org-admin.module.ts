@@ -13,6 +13,7 @@ import { CollaboratorInvitationService } from './collaborator-invitation.service
 import { CollaboratorController } from './collaborator.controller';
 import { CollaboratorService } from './collaborator.service';
 import { OwnershipTransferController } from './ownership-transfer.controller';
+import { OrgMemberGuard } from '../access-control/guards/org-member.guard';
 
 @Module({
   imports: [DatabaseModule, EmailModule],
@@ -30,6 +31,7 @@ import { OwnershipTransferController } from './ownership-transfer.controller';
     SearchService,
     CollaboratorInvitationService,
     CollaboratorService,
+    OrgMemberGuard,
   ],
   exports: [CompanyService, BusinessScopeService, SearchService],
 })
