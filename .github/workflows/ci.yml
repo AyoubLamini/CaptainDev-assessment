@@ -46,6 +46,9 @@ jobs:
       - name: Run Lint
         run: pnpm run lint
 
+      - name: Generate Prisma Client
+        run: pnpm --filter @nova/api prisma generate
+
       - name: Run Strict Type Check
         run: pnpm run typecheck
 
