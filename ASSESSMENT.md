@@ -42,7 +42,6 @@ Deliver an Organization administration area that allows an authorized Organizati
 - create, edit, and deactivate Companies, while preventing a Company with active business scopes from being silently deactivated by cascade;
 - create a business scope through a guided, duplicate-aware flow;
 - search and open only authorized Companies and business scopes;
-
 - invite a collaborator initially as a `User`, with explicit capabilities and scopes;
 - accept, resend, expire, or revoke invitations safely;
 - apply adjustable permission presets that resolve to explicit grants;
