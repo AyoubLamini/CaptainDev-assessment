@@ -64,7 +64,11 @@ pnpm run build
 ```
 
 ## Testing
-To execute the test suites across the project (Make sure the API server is running or that the Next.js dev server is stopped so Playwright can spin it up):
+Before running the tests locally, ensure your environment is correctly prepared:
+- **For Backend Tests (`@nova/api`):** The PostgreSQL database must be actively running (via Docker or hosted).
+- **For E2E Web Tests (`@nova/web`):** The backend API server must be actively running (`pnpm --filter @nova/api run start:dev`) so the frontend can communicate with it.
+- **For All Tests (`pnpm test`):** Both the database and the backend API server must be actively running.
+
 ```bash
 # Run all tests (API Unit/Integration and Web E2E)
 pnpm test
