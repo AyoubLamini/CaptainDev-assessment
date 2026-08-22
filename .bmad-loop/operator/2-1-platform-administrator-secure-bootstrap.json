@@ -1,9 +1,0 @@
-{
-  "actions": [
-    "Run the bootstrap script in the production environment using valid secure environment variables."
-  ],
-  "parked_at": "2026-08-18",
-  "run_id": "20260818-141916-ed4c",
-  "spec_file": "_bmad-output/implementation-artifacts/spec-2-1-platform-administrator-secure-bootstrap.md",
-  "story_key": "2-1-platform-administrator-secure-bootstrap"
-}
