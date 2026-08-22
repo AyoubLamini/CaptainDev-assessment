@@ -51,9 +51,8 @@ Thumbs.db
 *.swp
 *.swo
 
-.bmad-loop/runs/
-.bmad-loop/cache/
-.bmad-loop/policy.toml
+.agents/
+.bmad-loop/
 _bmad/
 _bmad-output/
 
