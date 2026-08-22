@@ -19,10 +19,13 @@ This submission implements the required vertical slices for the CaptainDev NOVA 
    ```bash
    pnpm install
    ```
-3. Set up your environment variables by copying the example files:
+3. Set up your environment variables. To avoid duplicates and confusion, we use a single unified `.env.example` file that contains all necessary variables for both the backend and frontend. Run the following to configure both:
    ```bash
+   # Configure the backend/global API
    cp .env.example .env
-   cp apps/web/.env.example apps/web/.env
+   
+   # Configure the Next.js frontend
+   cp .env.example apps/web/.env
    ```
    *Note: Our implementation securely enforces RLS by dropping privileges to `nova_app` during transactions. You do NOT need to configure a special database user in your `.env`—the default `postgres` superuser connection string works perfectly out of the box and remains secure!*
 
@@ -49,6 +52,12 @@ pnpm --filter @nova/api run start:dev
 pnpm --filter @nova/web run dev
 ```
 *Note: For local development, HTTP cookies are allowed, but production requires HTTPS for `__Host-` prefixed cookies.*
+
+### Building for Production
+To build both the frontend and backend for production, run:
+```bash
+pnpm run build
+```
 
 ### Testing Commands
 To execute the test suites across the project:

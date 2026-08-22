@@ -65,11 +65,8 @@ pnpm --filter @nova/web dev
 # Type-check all workspace packages
 pnpm -r tsc --noEmit
 
-# Build the API
-pnpm --filter @nova/api build
-
-# Build the web app
-pnpm --filter @nova/web build
+# Build everything for production (API & Web)
+pnpm run build
 
 # Run unit tests
 pnpm --filter @nova/api test

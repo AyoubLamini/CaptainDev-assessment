@@ -67,7 +67,7 @@ export default function CompaniesPage() {
             return { type: 'company', company: updatedCompany };
           } else {
             const scopeStillExists = updatedCompany.scopes?.some((s: any) => s.id === prev.scopeId);
-            return scopeStillExists ? { type: 'scope', company: updatedCompany, scopeId: prev.scopeId } : null;
+            return scopeStillExists && prev.scopeId ? { type: 'scope', company: updatedCompany, scopeId: prev.scopeId } : null;
           }
         });
       }
