@@ -27,7 +27,15 @@ cp .env.example apps/web/.env
 *(Fill in your `RESEND_API_KEY` and other credentials in the root `.env` file.)*
 
 ### 2. Database Setup & Seeding
-Initialize the database schema, apply all security roles, seed synthetic data, and securely bootstrap the platform administrator:
+
+**Option A (Docker - Recommended):** If you have Docker installed, you can quickly spin up a local PostgreSQL database that matches the default `.env` configuration by running:
+```bash
+docker compose up -d
+```
+
+**Option B (Hosted DB):** If you prefer not to use Docker, ensure you provide a valid connection string to your hosted PostgreSQL database in the `DATABASE_URL` variable in your `.env` file.
+
+Once your database is running, initialize the schema, apply security roles, seed synthetic data, and securely bootstrap the platform administrator:
 ```bash
 # Apply database schema and setup the restrictive RLS role
 pnpm --filter @nova/api prisma migrate deploy
