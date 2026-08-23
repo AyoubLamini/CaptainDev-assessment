@@ -16,15 +16,7 @@ Install dependencies:
 pnpm install
 ```
 
-Configure your environment variables. A single `.env.example` serves both the backend API and the Next.js frontend. Copy it to both required locations:
-```bash
-# Configure the backend/global API
-cp .env.example .env
-
-# Configure the Next.js frontend
-cp .env.example apps/web/.env
-```
-*(Fill in your `RESEND_API_KEY` and other credentials in the root `.env` file.)*
+Configure your environment variables by copying `.env.example` to `.env` in both `apps/api` and `apps/web`. *(Fill in your `RESEND_API_KEY` and other credentials in `apps/api/.env`.)*
 
 ### 2. Database Setup & Seeding
 
@@ -33,7 +25,7 @@ cp .env.example apps/web/.env
 docker compose up -d
 ```
 
-**Option B (Hosted DB):** If you prefer not to use Docker, ensure you provide a valid connection string to your hosted PostgreSQL database in the `DATABASE_URL` variable in your `.env` file.
+**Option B (Hosted DB):** If you prefer not to use Docker, ensure you provide a valid connection string to your hosted PostgreSQL database in the `DATABASE_URL` variable in your `apps/api/.env` file.
 
 Once your database is running, initialize the schema, apply security roles, seed synthetic data, and securely bootstrap the platform administrator:
 ```bash
