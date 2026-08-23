@@ -29,6 +29,9 @@ docker compose up -d
 
 Once your database is running, initialize the schema, apply security roles, seed synthetic data, and securely bootstrap the platform administrator:
 ```bash
+# Generate the Prisma Client
+pnpm --filter @nova/api prisma generate
+
 # Apply database schema and setup the restrictive RLS role
 pnpm --filter @nova/api prisma migrate deploy
 
