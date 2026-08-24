@@ -21,4 +21,4 @@ All quality gates and test suites are passing securely:
 - **End-to-End Test Suite (Web)**: Passed
 
 ## Demonstration
-Loom Video URL: [INSERT_LOOM_LINK_HERE]
+Loom Video URL: https://www.youtube.com/watch?v=77ipdWyQ_TI
